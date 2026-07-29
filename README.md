@@ -183,6 +183,14 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 - `/warn`, `/warns` et `/warn-retirer` gèrent les avertissements persistants.
 - `/timeout` et `/timeout-retirer` gèrent les exclusions temporaires Discord.
 - `/sanctions` affiche l'historique enregistré d'un membre.
+- Chaque sanction reçoit un numéro de dossier et les warns/timeouts peuvent être
+  annulés depuis leur bouton dans le journal.
+- À 3, 5 et 7 avertissements actifs, le bot applique automatiquement un timeout
+  d'une heure, d'un jour puis de sept jours.
+- `/note-ajouter`, `/notes-joueur` et `/note-retirer` gèrent les notes internes,
+  invisibles aux membres et aux Helpers.
+- `/staff-statistiques` affiche le classement mensuel ou le détail d'un membre du
+  staff : sanctions, tickets claim/clôturés et temps moyen de réponse.
 - Les arrivées/départs, mouvements vocaux, messages supprimés, messages
   modifiés, sanctions et transcriptions possèdent chacun leur propre salon.
 - `🧾・logs-discord` est créé automatiquement au démarrage et journalise les
@@ -190,6 +198,25 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
   vocales, surnoms, salons, rôles, permissions, sanctions et autres changements.
 - Le bot doit posséder les permissions `Voir le journal d'audit` et
   `Gérer les salons` pour assurer ce suivi et recréer le salon s'il est absent.
+
+## Gestion avancée des équipages
+
+- Le capitaine reçoit automatiquement en MP le guide de toutes ses commandes.
+- `/equipage-inviter`, `/equipage-exclure`, `/equipage-membres` et
+  `/equipage-limite` assurent la gestion quotidienne.
+- `/equipage-vice-capitaine` désigne un second disposant des droits de gestion.
+- `/equipage-transferer` transmet définitivement la capitainerie et
+  `/equipage-commandes` renvoie le guide privé.
+- `/equipage-classement` compare l'XP cumulée des membres de chaque équipage.
+- Chaque arrivée, départ, exclusion, nomination et changement important est
+  enregistré dans le salon privé de l'équipage.
+
+## Suggestions
+
+- `/suggestion` ouvre un formulaire dans le salon des suggestions.
+- Les boutons Pour et Contre enregistrent un vote unique et modifiable.
+- `/suggestion-statut` permet au staff d'accepter, refuser, remettre en attente
+  ou marquer comme réalisée une suggestion avec une réponse officielle.
 
 ## Événements
 

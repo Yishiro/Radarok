@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-logs-discord-et-claims"
+BOT_UPDATE_VERSION = "2026.07.29-equipages-moderation-suggestions"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -428,6 +428,7 @@ RULES_CHANNEL_NAME = stylize_channel_name("📜・règlement")
 ROLE_SELECTION_CHANNEL_NAME = stylize_channel_name("🎭・choix-des-rôles")
 FAQ_CHANNEL_NAME = stylize_channel_name("❓・faq")
 CHANGELOG_CHANNEL_NAME = stylize_channel_name("📰・changelog-serveur")
+SUGGESTIONS_CHANNEL_NAME = stylize_channel_name("💡・suggestions")
 TRADE_CHANNEL_NAME = stylize_channel_name("🤝・trades")
 PLAYER_CV_CHANNEL_NAME = stylize_channel_name("📄・cv-joueurs")
 CREW_PRESENTATION_CHANNEL_NAME = stylize_channel_name(
@@ -824,6 +825,47 @@ def initialize_database() -> None:
             guild_id INTEGER PRIMARY KEY,
             last_entry_id INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS moderation_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            moderator_id INTEGER NOT NULL,
+            note TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL,
+            removed_by INTEGER,
+            removed_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS suggestions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            channel_id INTEGER NOT NULL,
+            message_id INTEGER,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            staff_id INTEGER,
+            staff_response TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS suggestion_votes (
+            suggestion_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            vote INTEGER NOT NULL,
+            voted_at INTEGER NOT NULL,
+            PRIMARY KEY (suggestion_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS crew_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            crew_id INTEGER NOT NULL,
+            actor_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            target_id INTEGER,
+            created_at INTEGER NOT NULL
+        );
         """
     )
     crew_columns = {
@@ -833,6 +875,28 @@ def initialize_database() -> None:
         database.execute(
             "ALTER TABLE crews ADD COLUMN presentation_message_id INTEGER"
         )
+    if "vice_captain_id" not in crew_columns:
+        database.execute(
+            "ALTER TABLE crews ADD COLUMN vice_captain_id INTEGER"
+        )
+    if "max_members" not in crew_columns:
+        database.execute(
+            "ALTER TABLE crews ADD COLUMN max_members INTEGER NOT NULL DEFAULT 20"
+        )
+    ticket_columns = {
+        row[1] for row in database.execute("PRAGMA table_info(tickets)")
+    }
+    for column_name in ("claimed_at", "closed_by", "closed_at"):
+        if column_name not in ticket_columns:
+            database.execute(f"ALTER TABLE tickets ADD COLUMN {column_name} INTEGER")
+    sanction_columns = {
+        row[1] for row in database.execute("PRAGMA table_info(sanctions)")
+    }
+    for column_name in ("cancelled_by", "cancelled_at"):
+        if column_name not in sanction_columns:
+            database.execute(
+                f"ALTER TABLE sanctions ADD COLUMN {column_name} INTEGER"
+            )
     database.commit()
 
 
@@ -1736,8 +1800,12 @@ async def close_ticket(
         )
 
     connection.execute(
-        "UPDATE tickets SET status = 'closed' WHERE channel_id = ?",
-        (channel.id,),
+        """
+        UPDATE tickets
+        SET status = 'closed', closed_by = ?, closed_at = ?
+        WHERE channel_id = ?
+        """,
+        (interaction.user.id, int(time.time()), channel.id),
     )
     connection.commit()
     await update_helper_leaderboard(channel.guild)
@@ -1821,8 +1889,11 @@ class TicketControlView(discord.ui.View):
                 )
                 return
         connection.execute(
-            "UPDATE tickets SET claimed_by = ? WHERE channel_id = ?",
-            (interaction.user.id, interaction.channel.id),
+            """
+            UPDATE tickets SET claimed_by = ?, claimed_at = ?
+            WHERE channel_id = ?
+            """,
+            (interaction.user.id, int(time.time()), interaction.channel.id),
         )
         connection.commit()
         helper_role = discord.utils.get(
@@ -3163,7 +3234,8 @@ async def update_crew_presentation(guild: discord.Guild, crew_id: int) -> None:
     connection = require_database()
     row = connection.execute(
         """
-        SELECT owner_id, name, text_channel_id, presentation_message_id
+        SELECT owner_id, name, text_channel_id, presentation_message_id,
+               vice_captain_id, max_members
         FROM crews WHERE id = ? AND guild_id = ?
         """,
         (crew_id, guild.id),
@@ -3183,7 +3255,12 @@ async def update_crew_presentation(guild: discord.Guild, crew_id: int) -> None:
         title=f"🏴‍☠️ {row[1]}",
         description=(
             f"**Capitaine :** <@{row[0]}>\n"
-            f"**Membres :** {member_count}\n"
+            + (
+                f"**Vice-capitaine :** <@{row[4]}>\n"
+                if row[4] is not None
+                else ""
+            )
+            + f"**Membres :** {member_count}/{row[5]}\n"
             f"**Créé sur Radarok Community**"
         ),
         colour=discord.Colour.gold(),
@@ -3204,6 +3281,93 @@ async def update_crew_presentation(guild: discord.Guild, crew_id: int) -> None:
             (message.id, crew_id),
         )
         connection.commit()
+
+
+def crew_captain_guide_embed(crew_name: str) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"🏴‍☠️ Commandes de capitaine • {crew_name}",
+        description=(
+            "Conserve ce message : il contient toutes les commandes permettant "
+            "de gérer ton équipage."
+        ),
+        colour=discord.Colour.gold(),
+    )
+    embed.add_field(
+        name="Gestion des membres",
+        value=(
+            "`/equipage-inviter` — ajouter un membre\n"
+            "`/equipage-exclure` — retirer un membre\n"
+            "`/equipage-membres` — afficher l'équipage\n"
+            "`/equipage-vice-capitaine` — nommer ou remplacer le second\n"
+            "`/equipage-limite` — fixer la capacité entre 2 et 50"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Direction et recrutement",
+        value=(
+            "`/equipage-recrutement` — publier l'annonce officielle\n"
+            "`/equipage-transferer` — transmettre définitivement l'équipage\n"
+            "`/equipage-classement` — comparer l'activité des équipages\n"
+            "`/equipage-commandes` — recevoir à nouveau ce guide\n"
+            "`/equipage-supprimer` — supprimer définitivement l'équipage"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Commandes des membres",
+        value="`/equipage-quitter` — quitter volontairement l'équipage.",
+        inline=False,
+    )
+    embed.set_footer(
+        text="Une personne ne peut appartenir qu'à un seul équipage."
+    )
+    return embed
+
+
+async def send_crew_captain_guide(
+    captain: discord.Member, crew_name: str
+) -> bool:
+    try:
+        await captain.send(embed=crew_captain_guide_embed(crew_name))
+        return True
+    except discord.HTTPException:
+        return False
+
+
+async def log_crew_action(
+    guild: discord.Guild,
+    crew_id: int,
+    actor_id: int,
+    action: str,
+    target_id: int | None = None,
+) -> None:
+    connection = require_database()
+    connection.execute(
+        """
+        INSERT INTO crew_logs (
+            guild_id, crew_id, actor_id, action, target_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (guild.id, crew_id, actor_id, action[:500], target_id, int(time.time())),
+    )
+    connection.commit()
+    row = connection.execute(
+        "SELECT text_channel_id FROM crews WHERE id = ? AND guild_id = ?",
+        (crew_id, guild.id),
+    ).fetchone()
+    if row is None:
+        return
+    channel = guild.get_channel(row[0])
+    if isinstance(channel, discord.TextChannel):
+        target = f" • <@{target_id}>" if target_id is not None else ""
+        try:
+            await channel.send(
+                f"📒 <t:{int(time.time())}:F> • <@{actor_id}> — "
+                f"**{action}**{target}"
+            )
+        except discord.HTTPException:
+            pass
 
 
 async def create_crew_for_member(
@@ -3280,6 +3444,15 @@ async def create_crew_for_member(
         await text_channel.send(
             f"🏴‍☠️ Bienvenue dans l'équipage **{clean_name}** de "
             f"{owner.mention} !"
+        )
+        guide_sent = await send_crew_captain_guide(owner, clean_name)
+        if not guide_sent:
+            await text_channel.send(
+                f"{owner.mention}, tes messages privés sont fermés. Utilise "
+                "`/equipage-commandes` après les avoir ouverts pour recevoir le guide."
+            )
+        await log_crew_action(
+            guild, cursor.lastrowid, owner.id, "Équipage créé"
         )
         await update_crew_presentation(guild, cursor.lastrowid)
         return text_channel
@@ -3818,6 +3991,457 @@ class CrewRecruitmentView(discord.ui.View):
         )
 
 
+def get_managed_crew(guild_id: int, user_id: int) -> tuple | None:
+    return require_database().execute(
+        """
+        SELECT id, owner_id, vice_captain_id, name, role_id, text_channel_id,
+               voice_channel_id, max_members
+        FROM crews
+        WHERE guild_id = ? AND (owner_id = ? OR vice_captain_id = ?)
+        """,
+        (guild_id, user_id, user_id),
+    ).fetchone()
+
+
+@bot.tree.command(
+    name="equipage-commandes",
+    description="Reçoit en privé le guide complet de son équipage.",
+)
+async def crew_commands(interaction: discord.Interaction) -> None:
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        return
+    crew = get_managed_crew(interaction.guild.id, interaction.user.id)
+    if crew is None:
+        await interaction.response.send_message(
+            "Tu ne diriges aucun équipage.", ephemeral=True
+        )
+        return
+    if await send_crew_captain_guide(interaction.user, crew[3]):
+        await interaction.response.send_message(
+            "📨 Le guide complet vient de t'être envoyé en message privé.",
+            ephemeral=True,
+        )
+    else:
+        await interaction.response.send_message(
+            "Je ne peux pas t'envoyer de MP. Autorise les messages privés des "
+            "membres du serveur puis réessaie.",
+            ephemeral=True,
+        )
+
+
+@bot.tree.command(
+    name="equipage-inviter",
+    description="Ajoute un membre à ton équipage.",
+)
+async def crew_invite(
+    interaction: discord.Interaction, membre: discord.Member
+) -> None:
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        return
+    crew = get_managed_crew(interaction.guild.id, interaction.user.id)
+    if crew is None:
+        await interaction.response.send_message(
+            "Tu dois être capitaine ou vice-capitaine.", ephemeral=True
+        )
+        return
+    if membre.bot or membre.id == interaction.user.id:
+        await interaction.response.send_message(
+            "Ce membre ne peut pas être ajouté.", ephemeral=True
+        )
+        return
+    connection = require_database()
+    if connection.execute(
+        "SELECT 1 FROM crew_members WHERE guild_id = ? AND user_id = ?",
+        (interaction.guild.id, membre.id),
+    ).fetchone():
+        await interaction.response.send_message(
+            "Ce membre appartient déjà à un équipage.", ephemeral=True
+        )
+        return
+    member_count = connection.execute(
+        "SELECT COUNT(*) FROM crew_members WHERE crew_id = ?", (crew[0],)
+    ).fetchone()[0]
+    if member_count >= crew[7]:
+        await interaction.response.send_message(
+            f"L'équipage a atteint sa limite de **{crew[7]} membres**.",
+            ephemeral=True,
+        )
+        return
+    role = interaction.guild.get_role(crew[4])
+    if role is None:
+        await interaction.response.send_message(
+            "Le rôle de l'équipage est introuvable.", ephemeral=True
+        )
+        return
+    connection.execute(
+        """
+        INSERT INTO crew_members (crew_id, guild_id, user_id, joined_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (crew[0], interaction.guild.id, membre.id, int(time.time())),
+    )
+    connection.commit()
+    try:
+        await membre.add_roles(
+            role, reason=f"Invité dans {crew[3]} par {interaction.user}"
+        )
+    except discord.HTTPException:
+        connection.execute(
+            "DELETE FROM crew_members WHERE guild_id = ? AND user_id = ?",
+            (interaction.guild.id, membre.id),
+        )
+        connection.commit()
+        await interaction.response.send_message(
+            "Je n'ai pas pu attribuer le rôle à ce membre.", ephemeral=True
+        )
+        return
+    await log_crew_action(
+        interaction.guild, crew[0], interaction.user.id, "Membre ajouté", membre.id
+    )
+    await update_crew_presentation(interaction.guild, crew[0])
+    await interaction.response.send_message(
+        f"✅ {membre.mention} rejoint **{crew[3]}**.", ephemeral=True
+    )
+    try:
+        await membre.send(
+            f"🏴‍☠️ Tu as rejoint l'équipage **{crew[3]}** sur "
+            f"**{interaction.guild.name}**."
+        )
+    except discord.HTTPException:
+        pass
+
+
+@bot.tree.command(
+    name="equipage-exclure",
+    description="Exclut un membre de ton équipage.",
+)
+async def crew_exclude(
+    interaction: discord.Interaction, membre: discord.Member, raison: str
+) -> None:
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        return
+    crew = get_managed_crew(interaction.guild.id, interaction.user.id)
+    if crew is None:
+        await interaction.response.send_message(
+            "Tu dois être capitaine ou vice-capitaine.", ephemeral=True
+        )
+        return
+    if membre.id == crew[1]:
+        await interaction.response.send_message(
+            "Le capitaine ne peut pas être exclu.", ephemeral=True
+        )
+        return
+    if interaction.user.id == crew[2] and membre.id == crew[2]:
+        await interaction.response.send_message(
+            "Le vice-capitaine ne peut pas s'exclure avec cette commande.",
+            ephemeral=True,
+        )
+        return
+    connection = require_database()
+    membership = connection.execute(
+        """
+        SELECT 1 FROM crew_members
+        WHERE crew_id = ? AND guild_id = ? AND user_id = ?
+        """,
+        (crew[0], interaction.guild.id, membre.id),
+    ).fetchone()
+    if membership is None:
+        await interaction.response.send_message(
+            "Ce membre ne fait pas partie de ton équipage.", ephemeral=True
+        )
+        return
+    connection.execute(
+        "DELETE FROM crew_members WHERE guild_id = ? AND user_id = ?",
+        (interaction.guild.id, membre.id),
+    )
+    if membre.id == crew[2]:
+        connection.execute(
+            "UPDATE crews SET vice_captain_id = NULL WHERE id = ?", (crew[0],)
+        )
+    connection.commit()
+    role = interaction.guild.get_role(crew[4])
+    if role is not None:
+        await membre.remove_roles(
+            role, reason=f"Exclu de {crew[3]} : {raison[:200]}"
+        )
+    await log_crew_action(
+        interaction.guild,
+        crew[0],
+        interaction.user.id,
+        f"Membre exclu • {raison[:300]}",
+        membre.id,
+    )
+    await update_crew_presentation(interaction.guild, crew[0])
+    await interaction.response.send_message(
+        f"✅ {membre.mention} a été exclu de **{crew[3]}**.", ephemeral=True
+    )
+
+
+@bot.tree.command(
+    name="equipage-vice-capitaine",
+    description="Nomme ou remplace le vice-capitaine.",
+)
+async def crew_vice_captain(
+    interaction: discord.Interaction, membre: discord.Member
+) -> None:
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        return
+    crew = require_database().execute(
+        """
+        SELECT id, name, text_channel_id, voice_channel_id, vice_captain_id
+        FROM crews WHERE guild_id = ? AND owner_id = ?
+        """,
+        (interaction.guild.id, interaction.user.id),
+    ).fetchone()
+    if crew is None:
+        await interaction.response.send_message(
+            "Seul le capitaine peut nommer son vice-capitaine.", ephemeral=True
+        )
+        return
+    if membre.id == interaction.user.id:
+        await interaction.response.send_message(
+            "Tu es déjà capitaine.", ephemeral=True
+        )
+        return
+    membership = require_database().execute(
+        "SELECT 1 FROM crew_members WHERE crew_id = ? AND user_id = ?",
+        (crew[0], membre.id),
+    ).fetchone()
+    if membership is None:
+        await interaction.response.send_message(
+            "Ce membre doit d'abord appartenir à ton équipage.", ephemeral=True
+        )
+        return
+    require_database().execute(
+        "UPDATE crews SET vice_captain_id = ? WHERE id = ?",
+        (membre.id, crew[0]),
+    )
+    require_database().commit()
+    former_vice = (
+        interaction.guild.get_member(crew[4]) if crew[4] is not None else None
+    )
+    for channel_id in crew[2:4]:
+        channel = interaction.guild.get_channel(channel_id)
+        if channel is not None:
+            if former_vice is not None and former_vice.id != membre.id:
+                await channel.set_permissions(
+                    former_vice,
+                    overwrite=None,
+                    reason="Remplacement du vice-capitaine",
+                )
+            await channel.set_permissions(
+                membre,
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                connect=True,
+                speak=True,
+                manage_messages=True,
+                move_members=True,
+                reason="Vice-capitaine de l'équipage",
+            )
+    await log_crew_action(
+        interaction.guild,
+        crew[0],
+        interaction.user.id,
+        "Vice-capitaine nommé",
+        membre.id,
+    )
+    await send_crew_captain_guide(membre, crew[1])
+    await interaction.response.send_message(
+        f"✅ {membre.mention} est vice-capitaine de **{crew[1]}**.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="equipage-limite",
+    description="Définit le nombre maximal de membres.",
+)
+async def crew_limit(interaction: discord.Interaction, limite: int) -> None:
+    if interaction.guild is None:
+        return
+    crew = require_database().execute(
+        "SELECT id, name FROM crews WHERE guild_id = ? AND owner_id = ?",
+        (interaction.guild.id, interaction.user.id),
+    ).fetchone()
+    if crew is None:
+        await interaction.response.send_message(
+            "Seul le capitaine peut modifier la limite.", ephemeral=True
+        )
+        return
+    count = require_database().execute(
+        "SELECT COUNT(*) FROM crew_members WHERE crew_id = ?", (crew[0],)
+    ).fetchone()[0]
+    if limite < max(2, count) or limite > 50:
+        await interaction.response.send_message(
+            f"La limite doit être comprise entre **{max(2, count)}** et **50**.",
+            ephemeral=True,
+        )
+        return
+    require_database().execute(
+        "UPDATE crews SET max_members = ? WHERE id = ?", (limite, crew[0])
+    )
+    require_database().commit()
+    await log_crew_action(
+        interaction.guild,
+        crew[0],
+        interaction.user.id,
+        f"Limite fixée à {limite} membres",
+    )
+    await interaction.response.send_message(
+        f"✅ **{crew[1]}** accepte maintenant jusqu'à **{limite} membres**.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="equipage-membres",
+    description="Affiche les membres de ton équipage.",
+)
+async def crew_members_command(interaction: discord.Interaction) -> None:
+    if interaction.guild is None:
+        return
+    row = require_database().execute(
+        """
+        SELECT c.id, c.name, c.owner_id, c.vice_captain_id, c.max_members
+        FROM crew_members cm JOIN crews c ON c.id = cm.crew_id
+        WHERE cm.guild_id = ? AND cm.user_id = ?
+        """,
+        (interaction.guild.id, interaction.user.id),
+    ).fetchone()
+    if row is None:
+        await interaction.response.send_message(
+            "Tu n'appartiens à aucun équipage.", ephemeral=True
+        )
+        return
+    member_rows = require_database().execute(
+        """
+        SELECT user_id, joined_at FROM crew_members
+        WHERE crew_id = ? ORDER BY joined_at
+        """,
+        (row[0],),
+    ).fetchall()
+    lines = []
+    for user_id, joined_at in member_rows:
+        badge = "👑" if user_id == row[2] else "⚔️" if user_id == row[3] else "•"
+        lines.append(f"{badge} <@{user_id}> • depuis <t:{joined_at}:d>")
+    await interaction.response.send_message(
+        embed=discord.Embed(
+            title=f"🏴‍☠️ {row[1]} • {len(lines)}/{row[4]}",
+            description="\n".join(lines)[:4000],
+            colour=discord.Colour.gold(),
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="equipage-transferer",
+    description="Transfère définitivement ton équipage à un membre.",
+)
+async def crew_transfer(
+    interaction: discord.Interaction, nouveau_capitaine: discord.Member
+) -> None:
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        return
+    connection = require_database()
+    crew = connection.execute(
+        """
+        SELECT id, name, vice_captain_id, text_channel_id, voice_channel_id
+        FROM crews WHERE guild_id = ? AND owner_id = ?
+        """,
+        (interaction.guild.id, interaction.user.id),
+    ).fetchone()
+    if crew is None:
+        await interaction.response.send_message(
+            "Tu n'es capitaine d'aucun équipage.", ephemeral=True
+        )
+        return
+    if connection.execute(
+        "SELECT 1 FROM crew_members WHERE crew_id = ? AND user_id = ?",
+        (crew[0], nouveau_capitaine.id),
+    ).fetchone() is None:
+        await interaction.response.send_message(
+            "Le nouveau capitaine doit appartenir à ton équipage.", ephemeral=True
+        )
+        return
+    connection.execute(
+        """
+        UPDATE crews SET owner_id = ?, vice_captain_id = NULL WHERE id = ?
+        """,
+        (nouveau_capitaine.id, crew[0]),
+    )
+    connection.commit()
+    former_vice = (
+        interaction.guild.get_member(crew[2]) if crew[2] is not None else None
+    )
+    if former_vice is not None:
+        for channel_id in crew[3:5]:
+            channel = interaction.guild.get_channel(channel_id)
+            if channel is not None:
+                await channel.set_permissions(
+                    former_vice,
+                    overwrite=None,
+                    reason="Transfert de la capitainerie",
+                )
+    captain_role = discord.utils.get(interaction.guild.roles, name=CAPTAIN_ROLE_NAME)
+    if captain_role is not None:
+        await interaction.user.remove_roles(
+            captain_role, reason="Transfert de l'équipage"
+        )
+        await nouveau_capitaine.add_roles(
+            captain_role, reason="Nouveau capitaine de l'équipage"
+        )
+    await log_crew_action(
+        interaction.guild,
+        crew[0],
+        interaction.user.id,
+        "Capitainerie transférée",
+        nouveau_capitaine.id,
+    )
+    await send_crew_captain_guide(nouveau_capitaine, crew[1])
+    await update_crew_presentation(interaction.guild, crew[0])
+    await interaction.response.send_message(
+        f"✅ {nouveau_capitaine.mention} est maintenant capitaine de "
+        f"**{crew[1]}**.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="equipage-classement",
+    description="Affiche le classement d'activité des équipages.",
+)
+async def crew_ranking(interaction: discord.Interaction) -> None:
+    if interaction.guild is None:
+        return
+    rows = require_database().execute(
+        """
+        SELECT c.name, COUNT(cm.user_id),
+               COALESCE(SUM(ms.message_xp + ms.voice_xp + ms.bonus_xp), 0)
+        FROM crews c
+        LEFT JOIN crew_members cm ON cm.crew_id = c.id
+        LEFT JOIN member_stats ms
+          ON ms.guild_id = c.guild_id AND ms.user_id = cm.user_id
+        WHERE c.guild_id = ?
+        GROUP BY c.id ORDER BY 3 DESC LIMIT 15
+        """,
+        (interaction.guild.id,),
+    ).fetchall()
+    lines = [
+        f"`#{position}` **{name}** • {members} membre(s) • **{xp:,} XP**"
+        for position, (name, members, xp) in enumerate(rows, start=1)
+    ]
+    await interaction.response.send_message(
+        embed=discord.Embed(
+            title="🏆 Classement des équipages",
+            description="\n".join(lines) or "Aucun équipage.",
+            colour=discord.Colour.gold(),
+        )
+    )
+
+
 @bot.tree.command(name="equipage-quitter", description="Quitte ton équipage.")
 async def crew_leave(interaction: discord.Interaction) -> None:
     if interaction.guild is None or not isinstance(interaction.user, discord.Member):
@@ -3825,7 +4449,8 @@ async def crew_leave(interaction: discord.Interaction) -> None:
     connection = require_database()
     row = connection.execute(
         """
-        SELECT c.id, c.owner_id, c.name, c.role_id
+        SELECT c.id, c.owner_id, c.name, c.role_id, c.text_channel_id,
+               c.voice_channel_id, c.vice_captain_id
         FROM crew_members cm JOIN crews c ON c.id = cm.crew_id
         WHERE cm.guild_id = ? AND cm.user_id = ?
         """,
@@ -3845,11 +4470,34 @@ async def crew_leave(interaction: discord.Interaction) -> None:
         "DELETE FROM crew_members WHERE guild_id = ? AND user_id = ?",
         (interaction.guild.id, interaction.user.id),
     )
+    connection.execute(
+        """
+        UPDATE crews SET vice_captain_id = NULL
+        WHERE id = ? AND vice_captain_id = ?
+        """,
+        (row[0], interaction.user.id),
+    )
     connection.commit()
     role = interaction.guild.get_role(row[3])
     if role is not None:
         await interaction.user.remove_roles(role, reason="Départ de l'équipage")
+    if row[6] == interaction.user.id:
+        for channel_id in row[4:6]:
+            channel = interaction.guild.get_channel(channel_id)
+            if channel is not None:
+                await channel.set_permissions(
+                    interaction.user,
+                    overwrite=None,
+                    reason="Départ du vice-capitaine",
+                )
     await update_crew_presentation(interaction.guild, row[0])
+    await log_crew_action(
+        interaction.guild,
+        row[0],
+        interaction.user.id,
+        "Membre parti volontairement",
+        interaction.user.id,
+    )
     await interaction.response.send_message(
         f"Tu as quitté **{row[2]}**.", ephemeral=True
     )
@@ -4293,6 +4941,119 @@ async def trade_profile(
     )
 
 
+class SanctionUndoView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Annuler la sanction",
+        emoji="↩️",
+        style=discord.ButtonStyle.secondary,
+        custom_id="radarok:moderation:undo",
+    )
+    async def undo(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        if (
+            interaction.guild is None
+            or not isinstance(interaction.user, discord.Member)
+            or not is_ticket_staff(interaction.user)
+            or is_helper(interaction.user)
+            or interaction.message is None
+            or not interaction.message.embeds
+        ):
+            await interaction.response.send_message(
+                "Cette action est réservée au staff supérieur.", ephemeral=True
+            )
+            return
+        footer = interaction.message.embeds[0].footer.text or ""
+        match = re.search(r"#(\d+)", footer)
+        if match is None:
+            await interaction.response.send_message(
+                "Numéro de dossier introuvable.", ephemeral=True
+            )
+            return
+        case_id = int(match.group(1))
+        connection = require_database()
+        row = connection.execute(
+            """
+            SELECT user_id, action, cancelled_at FROM sanctions
+            WHERE id = ? AND guild_id = ?
+            """,
+            (case_id, interaction.guild.id),
+        ).fetchone()
+        if row is None or row[2] is not None:
+            await interaction.response.send_message(
+                "Ce dossier est introuvable ou déjà annulé.", ephemeral=True
+            )
+            return
+        target = interaction.guild.get_member(row[0])
+        if target is None:
+            await interaction.response.send_message(
+                "Le membre n'est plus sur le serveur.", ephemeral=True
+            )
+            return
+        action = row[1]
+        if action.startswith("Avertissement #"):
+            warning_match = re.search(r"#(\d+)", action)
+            if warning_match is None:
+                await interaction.response.send_message(
+                    "Avertissement associé introuvable.", ephemeral=True
+                )
+                return
+            connection.execute(
+                """
+                UPDATE warnings SET active = 0, removed_by = ?, removed_at = ?
+                WHERE id = ? AND guild_id = ? AND active = 1
+                """,
+                (
+                    interaction.user.id,
+                    int(time.time()),
+                    int(warning_match.group(1)),
+                    interaction.guild.id,
+                ),
+            )
+        elif action.startswith("Timeout") or action.startswith(
+            "Escalade automatique"
+        ):
+            try:
+                await target.timeout(
+                    None,
+                    reason=f"Dossier #{case_id} annulé par {interaction.user}",
+                )
+            except discord.HTTPException:
+                await interaction.response.send_message(
+                    "Discord a refusé le retrait du timeout.", ephemeral=True
+                )
+                return
+        else:
+            await interaction.response.send_message(
+                "Ce type de dossier ne peut pas être annulé automatiquement.",
+                ephemeral=True,
+            )
+            return
+        connection.execute(
+            """
+            UPDATE sanctions SET cancelled_by = ?, cancelled_at = ?
+            WHERE id = ?
+            """,
+            (interaction.user.id, int(time.time()), case_id),
+        )
+        connection.commit()
+        embed = interaction.message.embeds[0]
+        embed.colour = discord.Colour.green()
+        embed.title = f"↩️ Dossier #{case_id} annulé"
+        embed.add_field(
+            name="Annulation",
+            value=(
+                f"Par {interaction.user.mention} • "
+                f"<t:{int(time.time())}:F>"
+            ),
+            inline=False,
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
+
+
 async def send_sanction_log(
     guild: discord.Guild,
     *,
@@ -4301,9 +5062,10 @@ async def send_sanction_log(
     moderator: discord.abc.User | None,
     reason: str,
     colour: discord.Colour = discord.Colour.red(),
-) -> None:
+) -> int | None:
+    case_id: int | None = None
     if database is not None:
-        require_database().execute(
+        cursor = require_database().execute(
             """
             INSERT INTO sanctions (
                 guild_id, user_id, moderator_id, action, reason, created_at
@@ -4318,12 +5080,13 @@ async def send_sanction_log(
                 int(time.time()),
             ),
         )
+        case_id = cursor.lastrowid
         require_database().commit()
     channel = discord.utils.get(guild.text_channels, name=SANCTION_LOG_CHANNEL_NAME)
     if channel is None:
-        return
+        return case_id
     embed = discord.Embed(
-        title=f"⚖️ {action}",
+        title=f"⚖️ Dossier #{case_id} • {action}",
         colour=colour,
         timestamp=datetime.now(timezone.utc),
     )
@@ -4338,10 +5101,20 @@ async def send_sanction_log(
         inline=False,
     )
     embed.add_field(name="Motif", value=reason[:1024], inline=False)
+    embed.set_footer(text=f"Dossier de modération #{case_id}")
     try:
-        await channel.send(embed=embed)
+        reversible = (
+            action.startswith("Avertissement #")
+            or action.startswith("Timeout")
+            or action.startswith("Escalade automatique")
+        )
+        await channel.send(
+            embed=embed,
+            view=SanctionUndoView() if reversible else None,
+        )
     except discord.HTTPException:
         logging.exception("Impossible d'envoyer un journal de sanction")
+    return case_id
 
 
 @bot.tree.command(name="warn", description="Avertit un membre.")
@@ -4386,6 +5159,35 @@ async def warn_command(
         )
     except discord.HTTPException:
         pass
+    active_warns = require_database().execute(
+        """
+        SELECT COUNT(*) FROM warnings
+        WHERE guild_id = ? AND user_id = ? AND active = 1
+        """,
+        (interaction.guild.id, membre.id),
+    ).fetchone()[0]
+    escalation_seconds = {3: 3600, 5: 86400, 7: 604800}.get(active_warns)
+    if escalation_seconds is not None:
+        until = datetime.now(timezone.utc) + timedelta(seconds=escalation_seconds)
+        try:
+            await membre.timeout(
+                until,
+                reason=f"Escalade automatique après {active_warns} warns actifs",
+            )
+            await send_sanction_log(
+                interaction.guild,
+                action=(
+                    f"Escalade automatique • timeout "
+                    f"{format_remaining(escalation_seconds)}"
+                ),
+                target=membre,
+                moderator=interaction.user,
+                reason=f"Seuil de {active_warns} avertissements actifs atteint",
+            )
+        except discord.HTTPException:
+            logging.exception(
+                "Impossible d'appliquer l'escalade automatique à %s", membre.id
+            )
 
 
 @bot.tree.command(name="warns", description="Affiche les avertissements d'un membre.")
@@ -4815,6 +5617,234 @@ async def helper_leaderboard_command(interaction: discord.Interaction) -> None:
 
 
 @bot.tree.command(
+    name="note-ajouter",
+    description="Ajoute une note interne au dossier d'un membre.",
+)
+async def moderation_note_add(
+    interaction: discord.Interaction, membre: discord.Member, note: str
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+        or not is_ticket_staff(interaction.user)
+        or is_helper(interaction.user)
+    ):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    cursor = require_database().execute(
+        """
+        INSERT INTO moderation_notes (
+            guild_id, user_id, moderator_id, note, created_at
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            interaction.guild.id,
+            membre.id,
+            interaction.user.id,
+            note[:1500],
+            int(time.time()),
+        ),
+    )
+    require_database().commit()
+    await interaction.response.send_message(
+        f"📝 Note interne **#{cursor.lastrowid}** ajoutée au dossier de "
+        f"{membre.mention}.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="notes-joueur",
+    description="Consulte les notes internes d'un membre.",
+)
+async def moderation_notes_show(
+    interaction: discord.Interaction, membre: discord.Member
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+        or not is_ticket_staff(interaction.user)
+        or is_helper(interaction.user)
+    ):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    rows = require_database().execute(
+        """
+        SELECT id, moderator_id, note, created_at FROM moderation_notes
+        WHERE guild_id = ? AND user_id = ? AND active = 1
+        ORDER BY created_at DESC LIMIT 25
+        """,
+        (interaction.guild.id, membre.id),
+    ).fetchall()
+    description = "\n\n".join(
+        f"**Note #{note_id}** • <t:{created_at}:f> • <@{moderator_id}>\n{note}"
+        for note_id, moderator_id, note, created_at in rows
+    )[:4000]
+    await interaction.response.send_message(
+        embed=discord.Embed(
+            title=f"📝 Notes internes • {membre.display_name}",
+            description=description or "Aucune note interne active.",
+            colour=discord.Colour.dark_grey(),
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="note-retirer",
+    description="Archive une note interne par son numéro.",
+)
+async def moderation_note_remove(
+    interaction: discord.Interaction, identifiant: int
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+        or not is_ticket_staff(interaction.user)
+        or is_helper(interaction.user)
+    ):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    cursor = require_database().execute(
+        """
+        UPDATE moderation_notes
+        SET active = 0, removed_by = ?, removed_at = ?
+        WHERE id = ? AND guild_id = ? AND active = 1
+        """,
+        (
+            interaction.user.id,
+            int(time.time()),
+            identifiant,
+            interaction.guild.id,
+        ),
+    )
+    require_database().commit()
+    await interaction.response.send_message(
+        (
+            f"✅ Note **#{identifiant}** archivée."
+            if cursor.rowcount
+            else "Note active introuvable."
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="staff-statistiques",
+    description="Affiche les statistiques mensuelles du staff.",
+)
+async def staff_statistics(
+    interaction: discord.Interaction,
+    membre: discord.Member | None = None,
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+        or not is_ticket_staff(interaction.user)
+        or is_helper(interaction.user)
+    ):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    start = datetime.now(timezone.utc).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    since = int(start.timestamp())
+    connection = require_database()
+    if membre is not None:
+        sanctions = connection.execute(
+            """
+            SELECT COUNT(*) FROM sanctions
+            WHERE guild_id = ? AND moderator_id = ? AND created_at >= ?
+            """,
+            (interaction.guild.id, membre.id, since),
+        ).fetchone()[0]
+        claimed = connection.execute(
+            """
+            SELECT COUNT(*) FROM tickets
+            WHERE guild_id = ? AND claimed_by = ? AND claimed_at >= ?
+            """,
+            (interaction.guild.id, membre.id, since),
+        ).fetchone()[0]
+        closed = connection.execute(
+            """
+            SELECT COUNT(*) FROM tickets
+            WHERE guild_id = ? AND closed_by = ? AND closed_at >= ?
+            """,
+            (interaction.guild.id, membre.id, since),
+        ).fetchone()[0]
+        average_response = connection.execute(
+            """
+            SELECT AVG(claimed_at - created_at) FROM tickets
+            WHERE guild_id = ? AND claimed_by = ? AND claimed_at >= ?
+                  AND claimed_at IS NOT NULL
+            """,
+            (interaction.guild.id, membre.id, since),
+        ).fetchone()[0]
+        notes = connection.execute(
+            """
+            SELECT COUNT(*) FROM moderation_notes
+            WHERE guild_id = ? AND moderator_id = ? AND created_at >= ?
+            """,
+            (interaction.guild.id, membre.id, since),
+        ).fetchone()[0]
+        description = (
+            f"Sanctions enregistrées : **{sanctions}**\n"
+            f"Tickets claim : **{claimed}**\n"
+            f"Tickets clôturés : **{closed}**\n"
+            f"Temps de réponse moyen : "
+            f"**{format_duration(int(average_response or 0))}**\n"
+            f"Notes internes : **{notes}**"
+        )
+        title = f"📊 Statistiques • {membre.display_name}"
+    else:
+        rows = connection.execute(
+            """
+            SELECT moderator_id, COUNT(*) AS actions FROM sanctions
+            WHERE guild_id = ? AND moderator_id IS NOT NULL AND created_at >= ?
+            GROUP BY moderator_id ORDER BY actions DESC LIMIT 15
+            """,
+            (interaction.guild.id, since),
+        ).fetchall()
+        ticket_rows = dict(
+            connection.execute(
+                """
+                SELECT closed_by, COUNT(*) FROM tickets
+                WHERE guild_id = ? AND closed_by IS NOT NULL AND closed_at >= ?
+                GROUP BY closed_by
+                """,
+                (interaction.guild.id, since),
+            ).fetchall()
+        )
+        totals: dict[int, int] = {
+            moderator_id: actions for moderator_id, actions in rows
+        }
+        for user_id, tickets in ticket_rows.items():
+            totals[user_id] = totals.get(user_id, 0) + tickets
+        ranking = sorted(totals.items(), key=lambda item: item[1], reverse=True)
+        description = "\n".join(
+            f"`#{position}` <@{user_id}> • **{score} action(s)**"
+            for position, (user_id, score) in enumerate(ranking[:15], start=1)
+        ) or "Aucune action enregistrée ce mois-ci."
+        title = "📊 Classement mensuel du staff"
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        colour=discord.Colour.blue(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    embed.set_footer(text=f"Depuis le {start.strftime('%d/%m/%Y')} • données internes")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
     name="admin-commandes",
     description="Publie la liste des commandes d'administration.",
 )
@@ -4838,6 +5868,8 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
             "`/timeout` • placer un membre en timeout\n"
             "`/timeout-retirer` • retirer un timeout\n"
             "`/sanctions` • historique complet\n"
+            "`/note-ajouter`, `/notes-joueur`, `/note-retirer`\n"
+            "`/staff-statistiques` • activité mensuelle du staff\n"
             "`/infos-joueur` • informations — accessible aux helpers"
         ),
         inline=False,
@@ -4876,6 +5908,7 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
         name="🏴‍☠️ Équipages, niveaux et invitations",
         value=(
             "`/equipage-creer-pour` • créer un équipage pour un membre\n"
+            "`/suggestion-statut` • décision officielle\n"
             "`/niveau-donner`\n"
             "`/niveau-reinitialiser`\n"
             "`/invites-definir`"
@@ -4895,6 +5928,312 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
         text="Le rôle Helper ne possède aucune autre commande de modération"
     )
     await interaction.response.send_message(embed=embed)
+
+
+async def refresh_suggestion_message(
+    guild: discord.Guild, suggestion_id: int
+) -> None:
+    connection = require_database()
+    row = connection.execute(
+        """
+        SELECT channel_id, message_id, title, description, user_id, status,
+               staff_id, staff_response, created_at
+        FROM suggestions WHERE id = ? AND guild_id = ?
+        """,
+        (suggestion_id, guild.id),
+    ).fetchone()
+    if row is None or row[1] is None:
+        return
+    channel = guild.get_channel(row[0])
+    if not isinstance(channel, discord.TextChannel):
+        return
+    try:
+        message = await channel.fetch_message(row[1])
+    except discord.HTTPException:
+        return
+    votes = connection.execute(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END), 0)
+        FROM suggestion_votes WHERE suggestion_id = ?
+        """,
+        (suggestion_id,),
+    ).fetchone()
+    status_labels = {
+        "pending": "🟡 En attente",
+        "accepted": "🟢 Acceptée",
+        "rejected": "🔴 Refusée",
+        "done": "✅ Réalisée",
+    }
+    colours = {
+        "pending": discord.Colour.gold(),
+        "accepted": discord.Colour.green(),
+        "rejected": discord.Colour.red(),
+        "done": discord.Colour.blurple(),
+    }
+    embed = discord.Embed(
+        title=f"💡 Suggestion #{suggestion_id} • {row[2]}",
+        description=row[3],
+        colour=colours.get(row[5], discord.Colour.gold()),
+        timestamp=datetime.fromtimestamp(row[8], timezone.utc),
+    )
+    embed.add_field(name="Proposée par", value=f"<@{row[4]}>", inline=True)
+    embed.add_field(
+        name="Votes",
+        value=f"👍 **{votes[0]}** • 👎 **{votes[1]}**",
+        inline=True,
+    )
+    embed.add_field(
+        name="Statut",
+        value=status_labels.get(row[5], row[5]),
+        inline=True,
+    )
+    if row[7]:
+        embed.add_field(
+            name="Réponse officielle",
+            value=f"{row[7]}\n\n— <@{row[6]}>",
+            inline=False,
+        )
+    embed.set_footer(text="Vote modifiable • un seul vote par membre")
+    await message.edit(
+        embed=embed,
+        view=SuggestionVoteView() if row[5] == "pending" else None,
+    )
+
+
+class SuggestionVoteView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    async def record_vote(
+        self, interaction: discord.Interaction, vote: int
+    ) -> None:
+        if (
+            interaction.guild is None
+            or interaction.message is None
+            or interaction.user.bot
+        ):
+            return
+        connection = require_database()
+        suggestion = connection.execute(
+            """
+            SELECT id, user_id, status FROM suggestions
+            WHERE guild_id = ? AND message_id = ?
+            """,
+            (interaction.guild.id, interaction.message.id),
+        ).fetchone()
+        if suggestion is None or suggestion[2] != "pending":
+            await interaction.response.send_message(
+                "Les votes sont fermés pour cette suggestion.", ephemeral=True
+            )
+            return
+        if suggestion[1] == interaction.user.id:
+            await interaction.response.send_message(
+                "Tu ne peux pas voter pour ta propre suggestion.", ephemeral=True
+            )
+            return
+        previous = connection.execute(
+            """
+            SELECT vote FROM suggestion_votes
+            WHERE suggestion_id = ? AND user_id = ?
+            """,
+            (suggestion[0], interaction.user.id),
+        ).fetchone()
+        if previous is not None and previous[0] == vote:
+            connection.execute(
+                """
+                DELETE FROM suggestion_votes
+                WHERE suggestion_id = ? AND user_id = ?
+                """,
+                (suggestion[0], interaction.user.id),
+            )
+            result = "Ton vote a été retiré."
+        else:
+            connection.execute(
+                """
+                INSERT INTO suggestion_votes (
+                    suggestion_id, user_id, vote, voted_at
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(suggestion_id, user_id) DO UPDATE SET
+                    vote = excluded.vote, voted_at = excluded.voted_at
+                """,
+                (
+                    suggestion[0],
+                    interaction.user.id,
+                    vote,
+                    int(time.time()),
+                ),
+            )
+            result = "Ton vote a été enregistré."
+        connection.commit()
+        await interaction.response.send_message(result, ephemeral=True)
+        await refresh_suggestion_message(interaction.guild, suggestion[0])
+
+    @discord.ui.button(
+        label="Pour",
+        emoji="👍",
+        style=discord.ButtonStyle.success,
+        custom_id="radarok:suggestion:up",
+    )
+    async def vote_up(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.record_vote(interaction, 1)
+
+    @discord.ui.button(
+        label="Contre",
+        emoji="👎",
+        style=discord.ButtonStyle.danger,
+        custom_id="radarok:suggestion:down",
+    )
+    async def vote_down(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.record_vote(interaction, -1)
+
+
+class SuggestionModal(discord.ui.Modal):
+    def __init__(self) -> None:
+        super().__init__(title="💡 Nouvelle suggestion", timeout=600)
+        self.suggestion_title = discord.ui.TextInput(
+            label="Titre",
+            min_length=5,
+            max_length=100,
+            placeholder="Résume clairement ton idée",
+        )
+        self.details = discord.ui.TextInput(
+            label="Description",
+            min_length=20,
+            max_length=1500,
+            style=discord.TextStyle.paragraph,
+            placeholder="Explique l'idée, son intérêt et son fonctionnement",
+        )
+        self.add_item(self.suggestion_title)
+        self.add_item(self.details)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None or not isinstance(
+            interaction.channel, discord.TextChannel
+        ):
+            return
+        connection = require_database()
+        now = int(time.time())
+        cursor = connection.execute(
+            """
+            INSERT INTO suggestions (
+                guild_id, user_id, channel_id, title, description,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                interaction.guild.id,
+                interaction.user.id,
+                interaction.channel.id,
+                str(self.suggestion_title),
+                str(self.details),
+                now,
+                now,
+            ),
+        )
+        suggestion_id = cursor.lastrowid
+        connection.commit()
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(
+            title=f"💡 Suggestion #{suggestion_id} • {self.suggestion_title}",
+            description=str(self.details),
+            colour=discord.Colour.gold(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(
+            name="Proposée par", value=interaction.user.mention, inline=True
+        )
+        embed.add_field(name="Votes", value="👍 **0** • 👎 **0**", inline=True)
+        embed.add_field(name="Statut", value="🟡 En attente", inline=True)
+        embed.set_footer(text="Vote modifiable • un seul vote par membre")
+        message = await interaction.channel.send(
+            embed=embed, view=SuggestionVoteView()
+        )
+        connection.execute(
+            "UPDATE suggestions SET message_id = ? WHERE id = ?",
+            (message.id, suggestion_id),
+        )
+        connection.commit()
+        await interaction.followup.send(
+            f"✅ Suggestion publiée : {message.jump_url}", ephemeral=True
+        )
+
+
+@bot.tree.command(
+    name="suggestion",
+    description="Ouvre le formulaire pour proposer une idée.",
+)
+async def suggestion_create_command(interaction: discord.Interaction) -> None:
+    if (
+        not isinstance(interaction.channel, discord.TextChannel)
+        or interaction.channel.name != SUGGESTIONS_CHANNEL_NAME
+    ):
+        await interaction.response.send_message(
+            f"Utilise cette commande dans `{SUGGESTIONS_CHANNEL_NAME}`.",
+            ephemeral=True,
+        )
+        return
+    await interaction.response.send_modal(SuggestionModal())
+
+
+@bot.tree.command(
+    name="suggestion-statut",
+    description="Donne une décision officielle à une suggestion.",
+)
+@app_commands.choices(
+    statut=[
+        app_commands.Choice(name="Acceptée", value="accepted"),
+        app_commands.Choice(name="Refusée", value="rejected"),
+        app_commands.Choice(name="Réalisée", value="done"),
+        app_commands.Choice(name="Remettre en attente", value="pending"),
+    ]
+)
+async def suggestion_status_command(
+    interaction: discord.Interaction,
+    identifiant: int,
+    statut: app_commands.Choice[str],
+    reponse: str,
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+        or not is_ticket_staff(interaction.user)
+        or is_helper(interaction.user)
+    ):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    cursor = require_database().execute(
+        """
+        UPDATE suggestions
+        SET status = ?, staff_id = ?, staff_response = ?, updated_at = ?
+        WHERE id = ? AND guild_id = ?
+        """,
+        (
+            statut.value,
+            interaction.user.id,
+            reponse[:1000],
+            int(time.time()),
+            identifiant,
+            interaction.guild.id,
+        ),
+    )
+    require_database().commit()
+    if not cursor.rowcount:
+        await interaction.response.send_message(
+            "Suggestion introuvable.", ephemeral=True
+        )
+        return
+    await interaction.response.send_message(
+        f"✅ Suggestion **#{identifiant}** mise à jour.", ephemeral=True
+    )
+    await refresh_suggestion_message(interaction.guild, identifiant)
 
 
 class CommunityEventView(discord.ui.View):
@@ -6901,8 +8240,9 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         value=(
             "Création à partir du niveau 10, rôle Capitaine, présentation publique, "
             "CV par formulaire, annonces avec bouton Postuler, candidature privée, "
-            "acceptation/refus, salons privés et création assistée par le staff avec "
-            "`/equipage-creer-pour`."
+            "acceptation/refus, salons privés, vice-capitaine, limite, invitations, "
+            "exclusions, transfert, journal privé, classement d'activité et guide "
+            "complet envoyé en MP au capitaine."
         ),
         inline=False,
     )
@@ -6927,10 +8267,19 @@ async def publish_bot_update(guild: discord.Guild) -> None:
     embed.add_field(
         name="⚖️ Modération et journaux",
         value=(
-            "Warns, timeouts, historique des sanctions et journaux séparés pour "
+            "Dossiers numérotés, annulation par bouton, notes internes, escalade "
+            "automatique des warns, statistiques mensuelles et journaux séparés pour "
             "les messages, vocaux, arrivées, départs et tickets. Le nouveau journal "
             "Discord identifie précisément les actions du staff, et chaque claim de "
             "ticket conserve son auteur, sa date et son heure."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="💡 Suggestions communautaires",
+        value=(
+            "Formulaire `/suggestion`, votes Pour/Contre uniques et modifiables, "
+            "statut officiel En attente/Acceptée/Refusée/Réalisée et réponse du staff."
         ),
         inline=False,
     )
@@ -7016,7 +8365,8 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
                 "`/niveau` • afficher ta carte\n"
                 "`/classement` • classement d'activité\n"
                 "`/invites` • consulter tes invitations\n"
-                "`/cv-creer` • créer ou modifier ton CV"
+                "`/cv-creer` • créer ou modifier ton CV\n"
+                "`/suggestion` • proposer une idée"
             ),
             inline=False,
         )
@@ -7035,6 +8385,11 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
             value=(
                 "`/equipage-creer`\n"
                 "`/equipage-recrutement`\n"
+                "`/equipage-commandes`\n"
+                "`/equipage-inviter` • `/equipage-exclure`\n"
+                "`/equipage-vice-capitaine` • `/equipage-limite`\n"
+                "`/equipage-membres` • `/equipage-classement`\n"
+                "`/equipage-transferer`\n"
                 "`/equipage-quitter`\n"
                 "`/equipage-supprimer`"
             ),
@@ -7064,6 +8419,33 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
         await upsert_command_guide(
             commands_channel,
             title="🤖 Commandes de RadarokBot",
+            embed=embed,
+        )
+
+    suggestions_channel = discord.utils.get(
+        guild.text_channels, name=SUGGESTIONS_CHANNEL_NAME
+    )
+    if suggestions_channel is not None:
+        embed = discord.Embed(
+            title="💡 Proposer et voter une suggestion",
+            description=(
+                "Utilise **`/suggestion`** pour ouvrir le formulaire. Le bot publie "
+                "ensuite ton idée avec les boutons **Pour** et **Contre**."
+            ),
+            colour=discord.Colour.gold(),
+        )
+        embed.add_field(
+            name="Fonctionnement",
+            value=(
+                "Un seul vote par membre, modifiable à tout moment. Le staff indiquera "
+                "ensuite si la suggestion est acceptée, refusée ou réalisée, avec une "
+                "réponse officielle."
+            ),
+            inline=False,
+        )
+        await upsert_command_guide(
+            suggestions_channel,
+            title="💡 Proposer et voter une suggestion",
             embed=embed,
         )
 
@@ -7142,6 +8524,8 @@ async def setup_hook() -> None:
     bot.add_view(CommunityEventView())
     bot.add_view(CrewRecruitmentView())
     bot.add_view(CrewApplicationView())
+    bot.add_view(SuggestionVoteView())
+    bot.add_view(SanctionUndoView())
     if not voice_xp_loop.is_running():
         voice_xp_loop.start()
     if not giveaway_end_loop.is_running():
