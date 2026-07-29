@@ -1,7 +1,7 @@
 # RadarokBot
 
-Bot Discord en Python proposant une commande administrateur `/setup`. Elle crée
-automatiquement les catégories et salons reproduits depuis les captures du serveur.
+Bot Discord communautaire de Radarok's World. La commande administrateur
+`/setup` a été retirée après la configuration initiale du serveur.
 
 ## Installation
 
@@ -37,13 +37,10 @@ automatiquement les catégories et salons reproduits depuis les captures du serv
    python bot.py
    ```
 
-Utilise ensuite `/setup` avec un compte administrateur.
+## Structure du serveur
 
-## Comportement de `/setup`
-
-- La commande ne fonctionne que dans un serveur et pour un administrateur.
-- Elle supprime définitivement tous les salons, leurs messages et toutes les
-  catégories du serveur avant de reconstruire la structure.
+- L'ancien outil interne de configuration a créé la structure initiale. Il n'est
+  plus exposé comme commande Discord afin d'éviter une réinitialisation accidentelle.
 - Le salon Discord `1531432945888526376` est explicitement protégé et n'est
   jamais supprimé par `/setup`.
 - Les permissions d'écriture sont appliquées salon par salon. Le règlement,
@@ -69,7 +66,7 @@ Utilise ensuite `/setup` avec un compte administrateur.
 - Le bot attribue `🔒・Non vérifié` à l'arrivée et publie un message de bienvenue.
 - Le nouveau membre ne voit que la catégorie `🔐・VÉRIFICATION`. Après validation
   du règlement avec le bouton persistant, il reçoit `✅・Membre` et accède au serveur.
-- `/setup` publie automatiquement le règlement complet dans `📜・règlement`.
+- Le règlement complet est publié dans `📜・règlement`.
 - Les bots reçoivent automatiquement le rôle `🤖・Bots`.
 - Rejoindre `➕・Créer un vocal` crée un vocal `Équipage de …`, y déplace le
   membre et supprime automatiquement le salon lorsqu'il devient vide.
@@ -129,7 +126,7 @@ Utilise ensuite `/setup` avec un compte administrateur.
 - Les domaines d'hameçonnage courants, domaines en punycode, adresses IP et
   raccourcisseurs de liens sont bloqués.
 - Les comptes récents restent autorisés et aucun filtre de mots n'est activé.
-- `/setup` retire la permission de mentionner `@everyone` au rôle par défaut.
+- La permission de mentionner `@everyone` est retirée au rôle par défaut.
 
 ## Invitations et giveaways
 

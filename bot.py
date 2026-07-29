@@ -5188,14 +5188,8 @@ async def reset_level_command(
     )
 
 
-@bot.tree.command(
-    name="setup",
-    description="Efface les salons puis crée la structure et les rôles Radarok.",
-)
-@app_commands.guild_only()
-@app_commands.default_permissions(administrator=True)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup(interaction: discord.Interaction) -> None:
+async def _setup_server_structure(interaction: discord.Interaction) -> None:
+    """Ancien outil de reconstruction, volontairement absent des commandes slash."""
     guild = interaction.guild
     if guild is None:
         await interaction.response.send_message(
@@ -5941,8 +5935,7 @@ async def setup(interaction: discord.Interaction) -> None:
         )
 
 
-@setup.error
-async def setup_error(
+async def _setup_error(
     interaction: discord.Interaction, error: app_commands.AppCommandError
 ) -> None:
     if isinstance(error, app_commands.MissingPermissions):
@@ -6000,7 +5993,7 @@ async def publish_bot_update(guild: discord.Guild) -> None:
     embed.add_field(
         name="🧱 Installation automatique du serveur",
         value=(
-            "`/setup` reconstruit les catégories, salons, rôles, permissions et "
+            "La structure prévoit les catégories, salons, rôles, permissions et "
             "panneaux. Les salons protégés sont conservés et les espaces officiels "
             "restent en lecture seule."
         ),
