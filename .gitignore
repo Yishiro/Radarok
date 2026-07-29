@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+radarok.db
+radarok.db-shm
+radarok.db-wal
+transcripts/
+assets/ranks/source/
