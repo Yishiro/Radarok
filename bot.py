@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-guides-et-capitaines"
+BOT_UPDATE_VERSION = "2026.07.29-helper-automatique"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -2227,6 +2227,89 @@ async def ensure_helper_role(guild: discord.Guild) -> discord.Role | None:
     except discord.HTTPException:
         logging.exception("Impossible de créer ou migrer le rôle Helper")
         return None
+
+
+async def reconcile_helper_ticket_permissions(
+    guild: discord.Guild, helper_role: discord.Role
+) -> None:
+    connection = require_database()
+    rows = connection.execute(
+        """
+        SELECT channel_id, user_id, ticket_type, claimed_by, escalated
+        FROM tickets WHERE guild_id = ? AND status = 'open'
+        """,
+        (guild.id,),
+    ).fetchall()
+    database_changed = False
+    for channel_id, opener_id, ticket_type, claimed_by, escalated in rows:
+        channel = guild.get_channel(channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            connection.execute(
+                "UPDATE tickets SET status = 'closed' WHERE channel_id = ?",
+                (channel_id,),
+            )
+            database_changed = True
+            continue
+        helper_ticket = ticket_type in {"assistance", "signalement"} and not escalated
+        assigned_helper = (
+            guild.get_member(claimed_by) if claimed_by is not None else None
+        )
+        valid_assignment = (
+            assigned_helper is not None and is_helper(assigned_helper)
+        )
+        try:
+            if helper_ticket and valid_assignment:
+                await channel.set_permissions(
+                    helper_role,
+                    view_channel=False,
+                    reason="Restauration du claim exclusif Helper",
+                )
+                await channel.set_permissions(
+                    assigned_helper,
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                    reason="Restauration du Helper assigné",
+                )
+            elif helper_ticket:
+                if claimed_by is not None:
+                    connection.execute(
+                        """
+                        UPDATE tickets SET claimed_by = NULL
+                        WHERE channel_id = ?
+                        """,
+                        (channel_id,),
+                    )
+                    database_changed = True
+                    former_helper = guild.get_member(claimed_by)
+                    if former_helper is not None and former_helper.id != opener_id:
+                        await channel.set_permissions(
+                            former_helper,
+                            view_channel=False,
+                            reason="Ancien Helper retiré du ticket",
+                        )
+                await channel.set_permissions(
+                    helper_role,
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                    reason="Ticket disponible pour les Helpers",
+                )
+            else:
+                await channel.set_permissions(
+                    helper_role,
+                    view_channel=False,
+                    reason="Type de ticket réservé au staff supérieur",
+                )
+        except discord.HTTPException:
+            logging.exception(
+                "Impossible de réparer les permissions Helper du ticket %s",
+                channel_id,
+            )
+    if database_changed:
+        connection.commit()
 
 
 def staff_overwrites(
@@ -4513,6 +4596,164 @@ async def player_info_command(
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+def can_manage_helpers(member: discord.Member) -> bool:
+    return is_ticket_staff(member)
+
+
+@bot.tree.command(
+    name="helper-ajouter",
+    description="Ajoute le rôle Helper à un membre.",
+)
+async def helper_add_command(
+    interaction: discord.Interaction, membre: discord.Member
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not can_manage_helpers(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    if membre.bot:
+        await interaction.response.send_message(
+            "Un bot ne peut pas devenir Helper.", ephemeral=True
+        )
+        return
+    role = await ensure_helper_role(interaction.guild)
+    if role is None:
+        await interaction.response.send_message(
+            "Le rôle Helper n'a pas pu être créé.", ephemeral=True
+        )
+        return
+    await membre.add_roles(role, reason=f"Helper ajouté par {interaction.user}")
+    require_database().execute(
+        """
+        INSERT INTO helper_stats (guild_id, user_id, resolved_tickets, points)
+        VALUES (?, ?, 0, 0)
+        ON CONFLICT(guild_id, user_id) DO NOTHING
+        """,
+        (interaction.guild.id, membre.id),
+    )
+    require_database().commit()
+    await reconcile_helper_ticket_permissions(interaction.guild, role)
+    await update_helper_leaderboard(interaction.guild)
+    await interaction.response.send_message(
+        f"✅ {membre.mention} est maintenant **Helper**.", ephemeral=True
+    )
+
+
+@bot.tree.command(
+    name="helper-retirer",
+    description="Retire le rôle Helper à un membre.",
+)
+async def helper_remove_command(
+    interaction: discord.Interaction, membre: discord.Member
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not can_manage_helpers(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    role = discord.utils.get(interaction.guild.roles, name=HELPER_ROLE_NAME)
+    if role is None or role not in membre.roles:
+        await interaction.response.send_message(
+            "Ce membre ne possède pas le rôle Helper.", ephemeral=True
+        )
+        return
+    await membre.remove_roles(role, reason=f"Helper retiré par {interaction.user}")
+    require_database().execute(
+        """
+        UPDATE tickets SET claimed_by = NULL
+        WHERE guild_id = ? AND claimed_by = ? AND status = 'open'
+        """,
+        (interaction.guild.id, membre.id),
+    )
+    require_database().commit()
+    await reconcile_helper_ticket_permissions(interaction.guild, role)
+    await update_helper_leaderboard(interaction.guild)
+    await interaction.response.send_message(
+        f"✅ Le rôle Helper a été retiré à {membre.mention}. "
+        "Ses tickets ont été remis à disposition.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="helper-points-definir",
+    description="Définit exactement les points d'un Helper.",
+)
+async def helper_points_set_command(
+    interaction: discord.Interaction,
+    membre: discord.Member,
+    points: int,
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not can_manage_helpers(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    if points < 0:
+        await interaction.response.send_message(
+            "Le nombre de points ne peut pas être négatif.", ephemeral=True
+        )
+        return
+    role = await ensure_helper_role(interaction.guild)
+    if role is None or role not in membre.roles:
+        await interaction.response.send_message(
+            "Ce membre doit d'abord recevoir le rôle Helper.", ephemeral=True
+        )
+        return
+    require_database().execute(
+        """
+        INSERT INTO helper_stats (guild_id, user_id, resolved_tickets, points)
+        VALUES (?, ?, 0, ?)
+        ON CONFLICT(guild_id, user_id) DO UPDATE SET points = excluded.points
+        """,
+        (interaction.guild.id, membre.id, points),
+    )
+    require_database().commit()
+    await update_helper_leaderboard(interaction.guild)
+    await interaction.response.send_message(
+        f"🏆 {membre.mention} possède maintenant exactement "
+        f"**{points} point(s) Helper**.",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="helper-classement",
+    description="Actualise le classement des Helpers.",
+)
+async def helper_leaderboard_command(interaction: discord.Interaction) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not can_manage_helpers(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    await update_helper_leaderboard(interaction.guild)
+    await interaction.response.send_message(
+        "✅ Classement des Helpers actualisé.", ephemeral=True
+    )
+
+
 @bot.tree.command(
     name="admin-commandes",
     description="Publie la liste des commandes d'administration.",
@@ -4548,6 +4789,16 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
             "`/giveaway-terminer`\n"
             "`/giveaway-reroll`\n"
             "`/giveaway-annuler`"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🆘 Gestion des Helpers",
+        value=(
+            "`/helper-ajouter`\n"
+            "`/helper-retirer`\n"
+            "`/helper-points-definir`\n"
+            "`/helper-classement`"
         ),
         inline=False,
     )
@@ -6340,7 +6591,8 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         value=(
             "Assistance, signalements, partenariats et recrutements privés, formulaires, "
             "claim exclusif, transmission au staff supérieur, fermeture confirmée, "
-            "points helpers, classement et transcriptions."
+            "rôle automatique, permissions réparées au redémarrage, points Helpers, "
+            "classement et transcriptions."
         ),
         inline=False,
     )
@@ -7057,6 +7309,20 @@ async def on_member_join(member: discord.Member) -> None:
 @bot.event
 async def on_member_remove(member: discord.Member) -> None:
     await update_server_stats(member.guild)
+    if is_helper(member):
+        require_database().execute(
+            """
+            UPDATE tickets SET claimed_by = NULL
+            WHERE guild_id = ? AND claimed_by = ? AND status = 'open'
+            """,
+            (member.guild.id, member.id),
+        )
+        require_database().commit()
+        helper_role = discord.utils.get(
+            member.guild.roles, name=HELPER_ROLE_NAME
+        )
+        if helper_role is not None:
+            await reconcile_helper_ticket_permissions(member.guild, helper_role)
     log_channel = discord.utils.get(
         member.guild.text_channels, name=JOIN_LEAVE_LOG_CHANNEL_NAME
     )
@@ -7309,7 +7575,9 @@ async def on_ready() -> None:
         return
 
     for guild in bot.guilds:
-        await ensure_helper_role(guild)
+        helper_role = await ensure_helper_role(guild)
+        if helper_role is not None:
+            await reconcile_helper_ticket_permissions(guild, helper_role)
         await refresh_command_guides(guild)
         await update_server_stats(guild)
         await refresh_invite_cache(guild)

@@ -106,11 +106,17 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 - Chaque formulaire crée un salon privé visible par son auteur et le staff.
 - Un membre ne peut ouvrir qu'un ticket de chaque type à la fois.
 - Les helpers accèdent uniquement aux tickets Assistance et Signalement.
+- Le rôle `🆘・Helper` est créé ou migré automatiquement au démarrage, sans
+  permission sensible.
 - Lorsqu'un helper claim un ticket, les autres helpers n'y ont plus accès. Le
   staff supérieur conserve toujours l'accès.
 - Le helper peut clôturer le ticket ou le faire remonter au staff supérieur.
 - Un ticket résolu rapporte un point au helper assigné et actualise le
   classement des helpers.
+- `/helper-ajouter`, `/helper-retirer`, `/helper-points-definir` et
+  `/helper-classement` permettent au staff de gérer le système.
+- Un Helper peut uniquement consulter `/warns` et `/infos-joueur` parmi les
+  commandes réservées à l'équipe.
 - L'auteur ou le staff peut demander sa fermeture, avec confirmation.
 - Une transcription texte est envoyée dans `📁・transcripts-tickets` et conservée
   localement dans le dossier `transcripts`.
