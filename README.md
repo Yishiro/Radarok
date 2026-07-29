@@ -113,6 +113,13 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 - Chaque claim est envoyé dans `📨・tickets-staff` avec le ticket, son auteur,
   le membre du staff assigné, ainsi que la date et l'heure exactes.
 - Le helper peut clôturer le ticket ou le faire remonter au staff supérieur.
+- Le rôle `🔱・Staff supérieur` et la catégorie privée
+  `⬆️・TICKETS REMONTÉS` sont créés automatiquement au démarrage.
+- Les membres possédant les rôles Radarok, Responsable ou Administrateur
+  reçoivent automatiquement le rôle Staff supérieur.
+- Lors d'une remontée, le ticket est déplacé dans cette catégorie et ses
+  permissions sont reconstruites : seuls son auteur, le Staff supérieur et le
+  bot conservent l'accès. La remontée est aussi datée dans `📨・tickets-staff`.
 - Un ticket résolu rapporte un point au helper assigné et actualise le
   classement des helpers.
 - `/helper-ajouter`, `/helper-retirer`, `/helper-points-definir` et

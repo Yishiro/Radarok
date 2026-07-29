@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-equipages-moderation-suggestions"
+BOT_UPDATE_VERSION = "2026.07.29-tickets-staff-superieur"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -353,6 +353,7 @@ SERVER_STRUCTURE = (
         ),
     ),
     CategorySpec("🎫・TICKETS OUVERTS", (), staff_only=True),
+    CategorySpec("⬆️・TICKETS REMONTÉS", (), staff_only=True),
     CategorySpec(
         "🔊・VOCAUX",
         (
@@ -458,10 +459,17 @@ TICKET_RULES_CHANNEL_NAME = stylize_channel_name("📜・règlement-tickets")
 RECRUITMENT_INFO_CHANNEL_NAME = stylize_channel_name("📋・informations-recrutement")
 RECRUITMENT_PANEL_CHANNEL_NAME = stylize_channel_name("📝・postuler")
 TICKET_CATEGORY_NAME = decorate_category_name("🎫・TICKETS OUVERTS")
+ESCALATED_TICKET_CATEGORY_NAME = decorate_category_name("⬆️・TICKETS REMONTÉS")
 TICKET_LOG_CHANNEL_NAME = stylize_channel_name("📨・tickets-staff")
 TICKET_TRANSCRIPT_CHANNEL_NAME = stylize_channel_name("📁・transcripts-tickets")
 HELPER_LEADERBOARD_CHANNEL_NAME = stylize_channel_name("🏆・classement-helpers")
 HELPER_ROLE_NAME = "🆘・Helper"
+SUPERIOR_STAFF_ROLE_NAME = "🔱・Staff supérieur"
+SUPERIOR_SOURCE_ROLE_NAMES = (
+    "👑・Radarok",
+    "⚙️・Responsable",
+    "🛡️・Administrateur",
+)
 STAFF_VOICE_CATEGORY_NAME = decorate_category_name(
     "『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮"
 )
@@ -472,6 +480,7 @@ STAFF_ROLE_NAMES = (
     "🛡️・Administrateur",
     "🔨・Modérateur",
     "🧪・Modérateur en test",
+    SUPERIOR_STAFF_ROLE_NAME,
 )
 MESSAGE_XP_COOLDOWN = 60
 MESSAGE_XP_MIN = 15
@@ -1988,48 +1997,98 @@ class TicketControlView(discord.ui.View):
             return
         row = require_database().execute(
             """
-            SELECT claimed_by FROM tickets
+            SELECT id, user_id, claimed_by, ticket_type FROM tickets
             WHERE channel_id = ? AND status = 'open'
             """,
             (interaction.channel.id,),
         ).fetchone()
         if row is None or (
-            row[0] not in {None, interaction.user.id}
+            row[2] not in {None, interaction.user.id}
             and not is_ticket_staff(interaction.user)
         ):
             await interaction.response.send_message(
                 "Tu ne peux pas faire remonter ce ticket.", ephemeral=True
             )
             return
+        superior_role, escalated_category = await ensure_superior_staff_area(
+            interaction.guild
+        )
+        if superior_role is None or escalated_category is None:
+            await interaction.response.send_message(
+                "Impossible de préparer l'espace du staff supérieur. Vérifie les "
+                "permissions du bot.",
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
             "Le ticket a été transmis au staff supérieur.", ephemeral=True
         )
-        helper_role = discord.utils.get(
-            interaction.guild.roles, name=HELPER_ROLE_NAME
-        )
-        if helper_role is not None:
-            await interaction.channel.set_permissions(
-                helper_role,
-                view_channel=False,
-                reason="Ticket transmis au staff supérieur",
+        try:
+            await secure_escalated_ticket(
+                interaction.channel,
+                row[1],
+                superior_role,
+                escalated_category,
             )
-        if is_helper(interaction.user) and not is_ticket_staff(interaction.user):
-            await interaction.channel.set_permissions(
-                interaction.user,
-                view_channel=False,
-                reason="Ticket transmis au staff supérieur",
+        except discord.HTTPException:
+            logging.exception(
+                "Impossible de déplacer le ticket %s vers le Staff supérieur",
+                row[0],
             )
+            await interaction.followup.send(
+                "Discord a refusé le déplacement du ticket.", ephemeral=True
+            )
+            return
         require_database().execute(
             """
-            UPDATE tickets SET escalated = 1, claimed_by = NULL
+            UPDATE tickets SET escalated = 1, claimed_by = NULL,
+                               claimed_at = NULL
             WHERE channel_id = ?
             """,
             (interaction.channel.id,),
         )
         require_database().commit()
         await interaction.channel.send(
-            f"⬆️ {interaction.user.mention} a transmis ce ticket au staff supérieur."
+            f"⬆️ {superior_role.mention} • Le ticket **#{row[0]}** "
+            f"({row[3]}) a été remonté par {interaction.user.mention}.\n"
+            "Seul le membre concerné et le Staff supérieur peuvent désormais y accéder."
         )
+        log_channel = discord.utils.get(
+            interaction.guild.text_channels, name=TICKET_LOG_CHANNEL_NAME
+        )
+        if log_channel is not None:
+            escalated_at = int(time.time())
+            embed = discord.Embed(
+                title=f"⬆️ Ticket #{row[0]} remonté",
+                colour=discord.Colour.purple(),
+                timestamp=datetime.now(timezone.utc),
+            )
+            embed.add_field(
+                name="Ticket",
+                value=f"{interaction.channel.mention}\nType : **{row[3]}**",
+                inline=True,
+            )
+            embed.add_field(
+                name="Remonté par",
+                value=f"{interaction.user.mention}\n`{interaction.user.id}`",
+                inline=True,
+            )
+            embed.add_field(
+                name="Accès",
+                value=superior_role.mention,
+                inline=True,
+            )
+            embed.add_field(
+                name="Date et heure exactes",
+                value=f"<t:{escalated_at}:F>\n(<t:{escalated_at}:R>)",
+                inline=False,
+            )
+            try:
+                await log_channel.send(embed=embed)
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible de journaliser la remontée du ticket %s", row[0]
+                )
 
     @discord.ui.button(
         label="Fermer",
@@ -2360,6 +2419,146 @@ async def ensure_helper_role(guild: discord.Guild) -> discord.Role | None:
         return None
 
 
+async def ensure_superior_staff_area(
+    guild: discord.Guild,
+) -> tuple[discord.Role | None, discord.CategoryChannel | None]:
+    role = discord.utils.get(guild.roles, name=SUPERIOR_STAFF_ROLE_NAME)
+    try:
+        if role is None:
+            role = await guild.create_role(
+                name=SUPERIOR_STAFF_ROLE_NAME,
+                colour=discord.Colour(0x8E44AD),
+                permissions=discord.Permissions.none(),
+                hoist=True,
+                mentionable=False,
+                reason="Création automatique du rôle Staff supérieur",
+            )
+        elif role.permissions != discord.Permissions.none():
+            await role.edit(
+                permissions=discord.Permissions.none(),
+                reason="Sécurisation du rôle Staff supérieur",
+            )
+    except discord.HTTPException:
+        logging.exception("Impossible de créer le rôle Staff supérieur")
+        return None, None
+
+    members_to_promote: set[discord.Member] = set()
+    if guild.owner is not None:
+        members_to_promote.add(guild.owner)
+    for source_name in SUPERIOR_SOURCE_ROLE_NAMES:
+        source_role = discord.utils.get(guild.roles, name=source_name)
+        if source_role is not None:
+            members_to_promote.update(source_role.members)
+    for member in members_to_promote:
+        if role not in member.roles:
+            try:
+                await member.add_roles(
+                    role,
+                    reason="Accès automatique aux tickets remontés",
+                )
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible d'attribuer Staff supérieur à %s", member.id
+                )
+
+    bot_member = guild.me
+    if bot_member is None:
+        return role, None
+    overwrites: dict[
+        discord.Role | discord.Member, discord.PermissionOverwrite
+    ] = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        role: discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            attach_files=True,
+        ),
+        bot_member: discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            manage_channels=True,
+            manage_messages=True,
+        ),
+    }
+    category = discord.utils.get(
+        guild.categories, name=ESCALATED_TICKET_CATEGORY_NAME
+    )
+    try:
+        if category is None:
+            category = await guild.create_category(
+                ESCALATED_TICKET_CATEGORY_NAME,
+                overwrites=overwrites,
+                reason="Création automatique des tickets remontés",
+            )
+        else:
+            await category.edit(
+                overwrites=overwrites,
+                reason="Sécurisation des tickets remontés",
+            )
+        open_ticket_category = discord.utils.get(
+            guild.categories, name=TICKET_CATEGORY_NAME
+        )
+        if (
+            open_ticket_category is not None
+            and category.position != open_ticket_category.position + 1
+        ):
+            await category.edit(
+                position=open_ticket_category.position + 1,
+                reason="Placement des tickets remontés",
+            )
+    except discord.HTTPException:
+        logging.exception(
+            "Impossible de créer ou sécuriser la catégorie Staff supérieur"
+        )
+        return role, None
+    return role, category
+
+
+async def secure_escalated_ticket(
+    channel: discord.TextChannel,
+    opener_id: int,
+    superior_role: discord.Role,
+    category: discord.CategoryChannel,
+) -> None:
+    guild = channel.guild
+    opener = guild.get_member(opener_id)
+    bot_member = guild.me
+    overwrites: dict[
+        discord.Role | discord.Member, discord.PermissionOverwrite
+    ] = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        superior_role: discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            attach_files=True,
+        ),
+    }
+    if bot_member is not None:
+        overwrites[bot_member] = discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            attach_files=True,
+            manage_channels=True,
+            manage_messages=True,
+        )
+    if opener is not None:
+        overwrites[opener] = discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            attach_files=True,
+        )
+    await channel.edit(
+        category=category,
+        overwrites=overwrites,
+        reason="Ticket déplacé vers le Staff supérieur",
+    )
+
+
 async def reconcile_helper_ticket_permissions(
     guild: discord.Guild, helper_role: discord.Role
 ) -> None:
@@ -2434,6 +2633,20 @@ async def reconcile_helper_ticket_permissions(
                     view_channel=False,
                     reason="Type de ticket réservé au staff supérieur",
                 )
+                if escalated:
+                    superior_role = discord.utils.get(
+                        guild.roles, name=SUPERIOR_STAFF_ROLE_NAME
+                    )
+                    escalated_category = discord.utils.get(
+                        guild.categories, name=ESCALATED_TICKET_CATEGORY_NAME
+                    )
+                    if superior_role is not None and escalated_category is not None:
+                        await secure_escalated_ticket(
+                            channel,
+                            opener_id,
+                            superior_role,
+                            escalated_category,
+                        )
         except discord.HTTPException:
             logging.exception(
                 "Impossible de réparer les permissions Helper du ticket %s",
@@ -8260,7 +8473,8 @@ async def publish_bot_update(guild: discord.Guild) -> None:
             "Assistance, signalements, partenariats et recrutements privés, formulaires, "
             "claim exclusif, transmission au staff supérieur, fermeture confirmée, "
             "rôle automatique, permissions réparées au redémarrage, points Helpers, "
-            "classement et transcriptions."
+            "classement et transcriptions. Les tickets remontés sont déplacés dans "
+            "une catégorie privée réservée au rôle Staff supérieur."
         ),
         inline=False,
     )
@@ -9060,6 +9274,27 @@ async def on_member_remove(member: discord.Member) -> None:
 async def on_member_update(
     before: discord.Member, after: discord.Member
 ) -> None:
+    if before.roles != after.roles:
+        superior_role = discord.utils.get(
+            after.guild.roles, name=SUPERIOR_STAFF_ROLE_NAME
+        )
+        has_superior_source = any(
+            role.name in SUPERIOR_SOURCE_ROLE_NAMES for role in after.roles
+        )
+        if (
+            superior_role is not None
+            and has_superior_source
+            and superior_role not in after.roles
+        ):
+            try:
+                await after.add_roles(
+                    superior_role,
+                    reason="Accès automatique au Staff supérieur",
+                )
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible d'attribuer Staff supérieur à %s", after.id
+                )
     if before.premium_since != after.premium_since:
         await update_server_stats(after.guild)
     if before.premium_since is None and after.premium_since is not None:
@@ -9291,6 +9526,7 @@ async def on_ready() -> None:
         return
 
     for guild in bot.guilds:
+        await ensure_superior_staff_area(guild)
         helper_role = await ensure_helper_role(guild)
         if helper_role is not None:
             await reconcile_helper_ticket_permissions(guild, helper_role)
