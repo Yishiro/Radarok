@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-commandes-et-helper"
+BOT_UPDATE_VERSION = "2026.07.29-guides-et-capitaines"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1423,7 +1423,7 @@ async def create_ticket(
     category = discord.utils.get(guild.categories, name=TICKET_CATEGORY_NAME)
     if category is None:
         await interaction.response.send_message(
-            "La catégorie des tickets est absente. Un administrateur doit relancer `/setup`.",
+            "La catégorie des tickets est absente. Contacte un administrateur.",
             ephemeral=True,
         )
         return
@@ -3063,6 +3063,99 @@ async def update_crew_presentation(guild: discord.Guild, crew_id: int) -> None:
         connection.commit()
 
 
+async def create_crew_for_member(
+    guild: discord.Guild,
+    owner: discord.Member,
+    clean_name: str,
+    *,
+    reason: str,
+) -> discord.TextChannel:
+    category = discord.utils.get(guild.categories, name=CREW_CATEGORY_NAME)
+    if category is None:
+        raise RuntimeError("La catégorie privée des équipages est absente.")
+    connection = require_database()
+    role = await guild.create_role(
+        name=f"🏴‍☠️・{clean_name}",
+        colour=discord.Colour.random(),
+        reason=reason,
+    )
+    overwrites = dict(category.overwrites)
+    overwrites[role] = discord.PermissionOverwrite(
+        view_channel=True,
+        send_messages=True,
+        read_message_history=True,
+        connect=True,
+        speak=True,
+    )
+    text_channel: discord.TextChannel | None = None
+    voice_channel: discord.VoiceChannel | None = None
+    try:
+        text_channel = await guild.create_text_channel(
+            stylize_channel_name(f"🏴‍☠️・{clean_name}"),
+            category=category,
+            overwrites=overwrites,
+            reason=reason,
+        )
+        voice_channel = await guild.create_voice_channel(
+            stylize_channel_name(f"🔊・{clean_name}"),
+            category=category,
+            overwrites=overwrites,
+            reason=reason,
+        )
+        cursor = connection.execute(
+            """
+            INSERT INTO crews (
+                guild_id, owner_id, name, role_id, text_channel_id,
+                voice_channel_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                guild.id,
+                owner.id,
+                clean_name,
+                role.id,
+                text_channel.id,
+                voice_channel.id,
+                int(time.time()),
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO crew_members (crew_id, guild_id, user_id, joined_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (cursor.lastrowid, guild.id, owner.id, int(time.time())),
+        )
+        connection.commit()
+        captain_role = discord.utils.get(guild.roles, name=CAPTAIN_ROLE_NAME)
+        roles_to_add = [role]
+        if captain_role is not None:
+            roles_to_add.append(captain_role)
+        await owner.add_roles(
+            *roles_to_add, reason="Créateur et capitaine de l'équipage"
+        )
+        await text_channel.send(
+            f"🏴‍☠️ Bienvenue dans l'équipage **{clean_name}** de "
+            f"{owner.mention} !"
+        )
+        await update_crew_presentation(guild, cursor.lastrowid)
+        return text_channel
+    except Exception:
+        logging.exception("Échec de création de l'équipage %s", clean_name)
+        connection.rollback()
+        for channel in (text_channel, voice_channel):
+            if channel is not None:
+                try:
+                    await channel.delete(reason="Création d'équipage échouée")
+                except discord.HTTPException:
+                    pass
+        try:
+            await role.delete(reason="Création d'équipage échouée")
+        except discord.HTTPException:
+            pass
+        raise
+
+
 @bot.tree.command(name="equipage-creer", description="Crée ton équipage permanent.")
 @app_commands.describe(nom="Nom de l'équipage")
 async def crew_create(interaction: discord.Interaction, nom: str) -> None:
@@ -3093,98 +3186,87 @@ async def crew_create(interaction: discord.Interaction, nom: str) -> None:
             "Le nom doit contenir au moins deux caractères.", ephemeral=True
         )
         return
-    category = discord.utils.get(
-        interaction.guild.categories, name=CREW_CATEGORY_NAME
-    )
-    if category is None:
-        await interaction.response.send_message(
-            "La catégorie des équipages est absente. Relance `/setup`.",
-            ephemeral=True,
-        )
-        return
     await interaction.response.defer(ephemeral=True, thinking=True)
-    role = await interaction.guild.create_role(
-        name=f"🏴‍☠️・{clean_name}",
-        colour=discord.Colour.random(),
-        reason=f"Équipage créé par {interaction.user}",
-    )
-    overwrites = dict(category.overwrites)
-    overwrites[role] = discord.PermissionOverwrite(
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True,
-        connect=True,
-        speak=True,
-    )
     try:
-        text_channel = await interaction.guild.create_text_channel(
-            stylize_channel_name(f"🏴‍☠️・{clean_name}"),
-            category=category,
-            overwrites=overwrites,
-            reason=f"Équipage de {interaction.user}",
+        text_channel = await create_crew_for_member(
+            interaction.guild,
+            interaction.user,
+            clean_name,
+            reason=f"Équipage créé par {interaction.user}",
         )
-        voice_channel = await interaction.guild.create_voice_channel(
-            stylize_channel_name(f"🔊・{clean_name}"),
-            category=category,
-            overwrites=overwrites,
-            reason=f"Équipage de {interaction.user}",
-        )
-        cursor = connection.execute(
-            """
-            INSERT INTO crews (
-                guild_id, owner_id, name, role_id, text_channel_id,
-                voice_channel_id, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                interaction.guild.id,
-                interaction.user.id,
-                clean_name,
-                role.id,
-                text_channel.id,
-                voice_channel.id,
-                int(time.time()),
-            ),
-        )
-        connection.execute(
-            """
-            INSERT INTO crew_members (crew_id, guild_id, user_id, joined_at)
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                cursor.lastrowid,
-                interaction.guild.id,
-                interaction.user.id,
-                int(time.time()),
-            ),
-        )
-        connection.commit()
-        captain_role = discord.utils.get(
-            interaction.guild.roles, name=CAPTAIN_ROLE_NAME
-        )
-        roles_to_add = [role]
-        if captain_role is not None:
-            roles_to_add.append(captain_role)
-        await interaction.user.add_roles(
-            *roles_to_add, reason="Créateur et capitaine de l'équipage"
-        )
-        await text_channel.send(
-            f"🏴‍☠️ Bienvenue dans l'équipage **{clean_name}** de "
-            f"{interaction.user.mention} !"
-        )
-        await update_crew_presentation(interaction.guild, cursor.lastrowid)
     except Exception:
-        logging.exception("Échec de création de l'équipage")
-        try:
-            await role.delete(reason="Création d'équipage échouée")
-        except discord.HTTPException:
-            pass
         await interaction.followup.send(
-            "La création de l'équipage a échoué.", ephemeral=True
+            "La création de l'équipage a échoué. Vérifie que la catégorie privée "
+            "des équipages existe et que le bot peut gérer les rôles et salons.",
+            ephemeral=True,
         )
         return
     await interaction.followup.send(
         f"Équipage **{clean_name}** créé : {text_channel.mention}", ephemeral=True
+    )
+
+
+@bot.tree.command(
+    name="equipage-creer-pour",
+    description="Crée un équipage et désigne directement son capitaine.",
+)
+@app_commands.describe(
+    membre="Membre qui deviendra capitaine",
+    nom="Nom du nouvel équipage",
+)
+async def crew_create_for_command(
+    interaction: discord.Interaction,
+    membre: discord.Member,
+    nom: str,
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not is_ticket_staff(interaction.user) or is_helper(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff supérieur.", ephemeral=True
+        )
+        return
+    if membre.bot:
+        await interaction.response.send_message(
+            "Un bot ne peut pas devenir capitaine.", ephemeral=True
+        )
+        return
+    if require_database().execute(
+        "SELECT 1 FROM crew_members WHERE guild_id = ? AND user_id = ?",
+        (interaction.guild.id, membre.id),
+    ).fetchone():
+        await interaction.response.send_message(
+            "Ce membre appartient déjà à un équipage.", ephemeral=True
+        )
+        return
+    clean_name = " ".join(nom.split())[:40]
+    if len(clean_name) < 2:
+        await interaction.response.send_message(
+            "Le nom doit contenir au moins deux caractères.", ephemeral=True
+        )
+        return
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        text_channel = await create_crew_for_member(
+            interaction.guild,
+            membre,
+            clean_name,
+            reason=f"Équipage créé pour {membre} par {interaction.user}",
+        )
+    except Exception:
+        await interaction.followup.send(
+            "La création a échoué. Vérifie les permissions et la catégorie privée "
+            "des équipages.",
+            ephemeral=True,
+        )
+        return
+    await interaction.followup.send(
+        f"✅ {membre.mention} devient capitaine de **{clean_name}** : "
+        f"{text_channel.mention}",
+        ephemeral=True,
     )
 
 
@@ -3824,7 +3906,8 @@ class TradeOfferView(discord.ui.View):
         )
         if category is None:
             await interaction.response.send_message(
-                "La catégorie privée des trades est absente. Relance `/setup`.",
+                "La catégorie privée des trades est absente. "
+                "Contacte un administrateur.",
                 ephemeral=True,
             )
             return
@@ -3907,7 +3990,8 @@ async def trade_publish(
     )
     if channel is None:
         await interaction.response.send_message(
-            "Le marché des trades est absent. Relance `/setup`.", ephemeral=True
+            "Le marché des trades est absent. Contacte un administrateur.",
+            ephemeral=True,
         )
         return
     await interaction.response.defer(ephemeral=True)
@@ -4478,8 +4562,9 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
         inline=False,
     )
     embed.add_field(
-        name="📊 Niveaux et invitations",
+        name="🏴‍☠️ Équipages, niveaux et invitations",
         value=(
+            "`/equipage-creer-pour` • créer un équipage pour un membre\n"
             "`/niveau-donner`\n"
             "`/niveau-reinitialiser`\n"
             "`/invites-definir`"
@@ -4659,7 +4744,7 @@ async def event_create(
     )
     if channel is None:
         await interaction.response.send_message(
-            "Le salon d'annonces événement est absent. Relance `/setup`.",
+            "Le salon d'annonces événement est absent. Contacte un administrateur.",
             ephemeral=True,
         )
         return
@@ -5755,7 +5840,8 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 name="⚓ Comment créer un vocal privé ?",
                 value=(
                     "Rejoins le salon Créer un vocal. Ton équipage sera créé "
-                    "automatiquement et les commandes `/vocal` permettront de le gérer."
+                    "automatiquement. Gère-le avec `/vocal-limite`, `/vocal-prive`, "
+                    "`/vocal-inviter` et `/vocal-expulser`."
                 ),
                 inline=False,
             )
@@ -6236,7 +6322,8 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         value=(
             "Création à partir du niveau 10, rôle Capitaine, présentation publique, "
             "CV par formulaire, annonces avec bouton Postuler, candidature privée, "
-            "acceptation/refus et salons privés pour chaque équipage."
+            "acceptation/refus, salons privés et création assistée par le staff avec "
+            "`/equipage-creer-pour`."
         ),
         inline=False,
     )
@@ -6306,6 +6393,158 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         (guild.id, BOT_UPDATE_VERSION, message.id, int(time.time())),
     )
     connection.commit()
+
+
+async def upsert_command_guide(
+    channel: discord.TextChannel,
+    *,
+    title: str,
+    embed: discord.Embed,
+) -> None:
+    try:
+        async for message in channel.history(limit=100):
+            if (
+                message.author == bot.user
+                and message.embeds
+                and message.embeds[0].title == title
+            ):
+                await message.edit(embed=embed)
+                return
+        await channel.send(embed=embed)
+    except discord.HTTPException:
+        logging.exception("Impossible d'actualiser le guide %s", title)
+
+
+async def refresh_command_guides(guild: discord.Guild) -> None:
+    commands_channel = discord.utils.get(
+        guild.text_channels, name=COMMANDS_CHANNEL_NAME
+    )
+    if commands_channel is not None:
+        embed = discord.Embed(
+            title="🤖 Commandes de RadarokBot",
+            description=(
+                "Toutes les commandes utilisent des **tirets**. Les commandes "
+                "affichées par Discord avec un ancien nom ne doivent plus être utilisées."
+            ),
+            colour=discord.Colour.blue(),
+        )
+        embed.add_field(
+            name="📊 Profil et communauté",
+            value=(
+                "`/niveau` • afficher ta carte\n"
+                "`/classement` • classement d'activité\n"
+                "`/invites` • consulter tes invitations\n"
+                "`/cv-creer` • créer ou modifier ton CV"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🔊 Vocal temporaire",
+            value=(
+                "`/vocal-limite`\n"
+                "`/vocal-prive`\n"
+                "`/vocal-inviter`\n"
+                "`/vocal-expulser`"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🏴‍☠️ Équipages",
+            value=(
+                "`/equipage-creer`\n"
+                "`/equipage-recrutement`\n"
+                "`/equipage-quitter`\n"
+                "`/equipage-supprimer`"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🤝 Trades",
+            value=(
+                "`/trade-publier`\n"
+                "`/trade-avis`\n"
+                "`/trade-fermer`\n"
+                "`/trade-profil`"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🆘 Helpers",
+            value=(
+                "`/warns` et `/infos-joueur` sont les seules commandes staff "
+                "disponibles au rôle Helper."
+            ),
+            inline=False,
+        )
+        embed.set_footer(
+            text="Le staff peut publier son catalogue avec /admin-commandes"
+        )
+        await upsert_command_guide(
+            commands_channel,
+            title="🤖 Commandes de RadarokBot",
+            embed=embed,
+        )
+
+    cv_channel = discord.utils.get(guild.text_channels, name=PLAYER_CV_CHANNEL_NAME)
+    if cv_channel is not None:
+        embed = discord.Embed(
+            title="📄 Crée ton CV de joueur",
+            description=(
+                "Utilise uniquement **`/cv-creer`** dans ce salon. Le bot ouvre un "
+                "formulaire privé puis publie ton CV. Relance la commande pour le modifier."
+            ),
+            colour=discord.Colour.teal(),
+        )
+        embed.add_field(
+            name="Informations demandées",
+            value=(
+                "Pseudo Roblox, niveau et mer, profil Blox Fruits, disponibilités "
+                "et type d'équipage recherché."
+            ),
+            inline=False,
+        )
+        await upsert_command_guide(
+            cv_channel, title="📄 Crée ton CV de joueur", embed=embed
+        )
+
+    recruitment_channel = discord.utils.get(
+        guild.text_channels, name=CREW_RECRUITMENT_CHANNEL_NAME
+    )
+    if recruitment_channel is not None:
+        embed = discord.Embed(
+            title="📢 Recrutements d'équipages",
+            description=(
+                "Les capitaines publient uniquement avec "
+                "**`/equipage-recrutement`**. Le bot ouvre le formulaire et ajoute "
+                "le bouton **Postuler**.\n\n"
+                "Les candidats doivent d'abord utiliser `/cv-creer`."
+            ),
+            colour=discord.Colour.gold(),
+        )
+        await upsert_command_guide(
+            recruitment_channel,
+            title="📢 Recrutements d'équipages",
+            embed=embed,
+        )
+
+    market_channel = discord.utils.get(
+        guild.text_channels, name=TRADE_MARKET_CHANNEL_NAME
+    )
+    if market_channel is not None:
+        embed = discord.Embed(
+            title="🤝 Marché sécurisé des trades",
+            description=(
+                "Publie avec **`/trade-publier`**. Une personne intéressée utilise "
+                "le bouton de l'annonce, puis les deux membres terminent avec "
+                "`/trade-avis`. Utilise `/trade-fermer` si l'échange est annulé."
+            ),
+            colour=discord.Colour.teal(),
+        )
+        await upsert_command_guide(
+            market_channel,
+            title="🤝 Marché sécurisé des trades",
+            embed=embed,
+        )
 
 
 @bot.event
@@ -7071,6 +7310,7 @@ async def on_ready() -> None:
 
     for guild in bot.guilds:
         await ensure_helper_role(guild)
+        await refresh_command_guides(guild)
         await update_server_stats(guild)
         await refresh_invite_cache(guild)
         await restore_invite_roles(guild)

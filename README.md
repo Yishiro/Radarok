@@ -152,6 +152,8 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
   qu'à un seul équipage.
 - Un équipage reçoit un rôle, un salon textuel et un vocal privés.
 - Le créateur reçoit le rôle `👑・Capitaine d'équipage`.
+- Le staff peut utiliser `/equipage-creer-pour` pour créer directement un
+  équipage au nom d'un membre et le désigner capitaine.
 - `/cv-creer`, utilisable dans le salon CV, ouvre un formulaire et publie ou
   actualise le CV du joueur.
 - `/equipage-recrutement`, réservé au capitaine et au salon de recrutement,
