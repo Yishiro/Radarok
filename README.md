@@ -70,8 +70,8 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 - Les bots reçoivent automatiquement le rôle `🤖・Bots`.
 - Rejoindre `➕・Créer un vocal` crée un vocal `Équipage de …`, y déplace le
   membre et supprime automatiquement le salon lorsqu'il devient vide.
-- Le propriétaire contrôle son vocal avec `/vocal limite`, `/vocal prive`,
-  `/vocal inviter` et `/vocal expulser`.
+- Le propriétaire contrôle son vocal avec `/vocal-limite`, `/vocal-prive`,
+  `/vocal-inviter` et `/vocal-expulser`.
 - Lors de la création, le bot publie automatiquement l'aide de gestion dans le
   chat textuel intégré au vocal temporaire, en mentionnant son propriétaire.
 
@@ -92,7 +92,7 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 - `/classement` affiche les dix membres les plus actifs.
 - `/niveau-donner` permet à un administrateur d'accorder autant de niveaux que
   souhaité, sans limite applicative.
-- `/niveau-reset` remet l'XP et le niveau d'un membre à zéro tout en conservant
+- `/niveau-reinitialiser` remet l'XP et le niveau d'un membre à zéro tout en conservant
   ses compteurs historiques de messages et de temps vocal.
   L'XP offert est enregistré comme bonus, sans modifier les statistiques de
   messages ou de vocal.
@@ -131,7 +131,7 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 ## Invitations et giveaways
 
 - `/invites` affiche le compteur, le rôle actuel et le prochain palier.
-- `/invites-set` remplace exactement le compteur d'un membre.
+- `/invites-definir` remplace exactement le compteur d'un membre.
 - Recruteur, Ambassadeur, Influenceur et Maître recruteur sont attribués
   automatiquement à 5, 10, 15 et 20 invitations.
 - `/giveaway-creer` publie les boutons Participer, Participants, Durée et Mes chances.
@@ -148,39 +148,39 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 
 ## Équipages et trades
 
-- Le niveau 10 est requis pour `/equipage creer`. Un membre ne peut appartenir
+- Le niveau 10 est requis pour `/equipage-creer`. Un membre ne peut appartenir
   qu'à un seul équipage.
 - Un équipage reçoit un rôle, un salon textuel et un vocal privés.
 - Le créateur reçoit le rôle `👑・Capitaine d'équipage`.
-- `/cv creer`, utilisable dans le salon CV, ouvre un formulaire et publie ou
+- `/cv-creer`, utilisable dans le salon CV, ouvre un formulaire et publie ou
   actualise le CV du joueur.
-- `/equipage recrutement`, réservé au capitaine et au salon de recrutement,
+- `/equipage-recrutement`, réservé au capitaine et au salon de recrutement,
   ouvre un formulaire puis publie une annonce avec un bouton Postuler.
 - Un CV est obligatoire pour postuler. Le bot crée ensuite un salon privé entre
   le candidat et le capitaine, avec les boutons Accepter et Refuser.
 - Une acceptation attribue automatiquement le rôle de l'équipage.
-- Le propriétaire utilise `/equipage supprimer`; les membres peuvent utiliser
-  `/equipage quitter`.
-- `/trade publier` accepte du texte et les emojis personnalisés du serveur.
+- Le propriétaire utilise `/equipage-supprimer`; les membres peuvent utiliser
+  `/equipage-quitter`.
+- `/trade-publier` accepte du texte et les emojis personnalisés du serveur.
 - Le bouton d'intérêt crée un salon privé entre les deux participants. Aucun
   des deux ne peut commencer un autre trade avant la clôture.
-- `/trade avis` enregistre une note de 1 à 5. Les deux avis clôturent le trade.
-  `/trade fermer` permet de terminer une transaction annulée ou inachevée.
-- `/trade profil` affiche la moyenne et le nombre d'avis reçus.
+- `/trade-avis` enregistre une note de 1 à 5. Les deux avis clôturent le trade.
+  `/trade-fermer` permet de terminer une transaction annulée ou inachevée.
+- `/trade-profil` affiche la moyenne et le nombre d'avis reçus.
 
 ## Modération et journaux
 
-- `/warn`, `/warnings` et `/unwarn` gèrent les avertissements persistants.
-- `/timeout` et `/untimeout` gèrent les exclusions temporaires Discord.
+- `/warn`, `/warns` et `/warn-retirer` gèrent les avertissements persistants.
+- `/timeout` et `/timeout-retirer` gèrent les exclusions temporaires Discord.
 - `/sanctions` affiche l'historique enregistré d'un membre.
 - Les arrivées/départs, mouvements vocaux, messages supprimés, messages
   modifiés, sanctions et transcriptions possèdent chacun leur propre salon.
 
 ## Événements
 
-- `/evenement creer` publie un événement avec bouton d'inscription, nombre de
+- `/evenement-creer` publie un événement avec bouton d'inscription, nombre de
   places et liste d'attente automatique.
 - Les rappels sont envoyés 24 heures et 30 minutes avant le début.
-- `/evenement annuler` et `/evenement terminer` ferment les inscriptions.
-- `/evenement resultats` publie le podium et attribue les rôles Champion,
+- `/evenement-annuler` et `/evenement-terminer` ferment les inscriptions.
+- `/evenement-resultats` publie le podium et attribue les rôles Champion,
   Finaliste et Troisième événement.

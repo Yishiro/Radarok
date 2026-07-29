@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-equipages-et-cv"
+BOT_UPDATE_VERSION = "2026.07.29-commandes-et-helper"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -193,7 +193,7 @@ ROLE_SPECS = (
     RoleSpec("🌊・Sea Events", 0x2980B9),
     RoleSpec("🐉・V4", 0x8E44AD),
     RoleSpec("🔄・Trades", 0x16A085),
-    RoleSpec("🆘・Helper Blox Fruits", 0x27AE60, hoist=True),
+    RoleSpec("🆘・Helper", 0x27AE60, hoist=True),
     RoleSpec("👤・Human", 0xD5D8DC),
     RoleSpec("🐇・Rabbit", 0xF5B7B1),
     RoleSpec("🦈・Shark", 0x3498DB),
@@ -457,7 +457,7 @@ TICKET_CATEGORY_NAME = decorate_category_name("🎫・TICKETS OUVERTS")
 TICKET_LOG_CHANNEL_NAME = stylize_channel_name("📨・tickets-staff")
 TICKET_TRANSCRIPT_CHANNEL_NAME = stylize_channel_name("📁・transcripts-tickets")
 HELPER_LEADERBOARD_CHANNEL_NAME = stylize_channel_name("🏆・classement-helpers")
-HELPER_ROLE_NAME = "🆘・Helper Blox Fruits"
+HELPER_ROLE_NAME = "🆘・Helper"
 STAFF_VOICE_CATEGORY_NAME = decorate_category_name(
     "『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮"
 )
@@ -2193,6 +2193,42 @@ async def ensure_roles(
     return roles, created_count
 
 
+async def ensure_helper_role(guild: discord.Guild) -> discord.Role | None:
+    role = discord.utils.get(guild.roles, name=HELPER_ROLE_NAME)
+    if role is not None:
+        if role.permissions != discord.Permissions.none():
+            try:
+                await role.edit(
+                    permissions=discord.Permissions.none(),
+                    reason="Sécurisation du rôle Helper",
+                )
+            except discord.HTTPException:
+                logging.exception("Impossible de sécuriser le rôle Helper")
+        return role
+    legacy_role = discord.utils.get(
+        guild.roles, name="🆘・Helper Blox Fruits"
+    )
+    try:
+        if legacy_role is not None:
+            await legacy_role.edit(
+                name=HELPER_ROLE_NAME,
+                permissions=discord.Permissions.none(),
+                reason="Migration du rôle Helper",
+            )
+            return legacy_role
+        return await guild.create_role(
+            name=HELPER_ROLE_NAME,
+            colour=discord.Colour(0x27AE60),
+            permissions=discord.Permissions.none(),
+            hoist=True,
+            mentionable=False,
+            reason="Création automatique du rôle Helper",
+        )
+    except discord.HTTPException:
+        logging.exception("Impossible de créer ou migrer le rôle Helper")
+        return None
+
+
 def staff_overwrites(
     guild: discord.Guild, roles: dict[str, discord.Role]
 ) -> dict[discord.Role | discord.Member, discord.PermissionOverwrite]:
@@ -2590,10 +2626,10 @@ def build_voice_help_embed() -> discord.Embed:
         description=(
             f"Rejoins **{TEMP_VOICE_TRIGGER_NAME}** pour créer automatiquement "
             f"un salon nommé `{TEMP_VOICE_PREFIX}ton pseudo`.\n\n"
-            "`/vocal limite` — choisir le nombre maximal de membres\n"
-            "`/vocal prive` — verrouiller ou rouvrir le vocal\n"
-            "`/vocal inviter` — autoriser un membre dans un vocal privé\n"
-            "`/vocal expulser` — déconnecter un membre du vocal\n\n"
+            "`/vocal-limite` — choisir le nombre maximal de membres\n"
+            "`/vocal-prive` — verrouiller ou rouvrir le vocal\n"
+            "`/vocal-inviter` — autoriser un membre dans un vocal privé\n"
+            "`/vocal-expulser` — déconnecter un membre du vocal\n\n"
             "Le salon est supprimé automatiquement lorsqu'il devient vide."
         ),
         colour=discord.Colour.blue(),
@@ -2619,13 +2655,7 @@ def owned_temporary_channel(
     return channel if overwrite.manage_channels is True else None
 
 
-vocal_group = app_commands.Group(
-    name="vocal",
-    description="Gère le vocal temporaire dont tu es propriétaire.",
-)
-
-
-@vocal_group.command(name="limite", description="Change la limite de ton vocal.")
+@bot.tree.command(name="vocal-limite", description="Change la limite de ton vocal.")
 @app_commands.describe(nombre="Nombre maximal de membres, ou 0 pour aucune limite")
 async def vocal_limit(interaction: discord.Interaction, nombre: int) -> None:
     channel = owned_temporary_channel(interaction)
@@ -2651,8 +2681,8 @@ async def vocal_limit(interaction: discord.Interaction, nombre: int) -> None:
     )
 
 
-@vocal_group.command(
-    name="prive",
+@bot.tree.command(
+    name="vocal-prive",
     description="Rend ton vocal privé ou de nouveau public.",
 )
 @app_commands.describe(active="Oui pour verrouiller le vocal, non pour le rouvrir")
@@ -2685,8 +2715,8 @@ async def vocal_private(interaction: discord.Interaction, active: bool) -> None:
     )
 
 
-@vocal_group.command(
-    name="inviter",
+@bot.tree.command(
+    name="vocal-inviter",
     description="Autorise un membre à rejoindre ton vocal privé.",
 )
 @app_commands.describe(membre="Membre à autoriser dans ton vocal")
@@ -2747,8 +2777,8 @@ async def vocal_invite(
     await interaction.response.send_message(confirmation, ephemeral=True)
 
 
-@vocal_group.command(
-    name="expulser",
+@bot.tree.command(
+    name="vocal-expulser",
     description="Expulse un membre de ton vocal.",
 )
 @app_commands.describe(membre="Membre à déconnecter de ton vocal")
@@ -2779,9 +2809,6 @@ async def vocal_kick(
     await interaction.response.send_message(
         f"{membre.mention} a été expulsé du vocal.", ephemeral=True
     )
-
-
-bot.tree.add_command(vocal_group)
 
 
 class PlayerCVModal(discord.ui.Modal):
@@ -2917,12 +2944,7 @@ class PlayerCVModal(discord.ui.Modal):
         )
 
 
-cv_group = app_commands.Group(
-    name="cv", description="Crée et gère ton CV de joueur Blox Fruits."
-)
-
-
-@cv_group.command(name="creer", description="Ouvre le formulaire de CV joueur.")
+@bot.tree.command(name="cv-creer", description="Ouvre le formulaire de CV joueur.")
 async def cv_create(interaction: discord.Interaction) -> None:
     if (
         not isinstance(interaction.channel, discord.TextChannel)
@@ -2935,15 +2957,6 @@ async def cv_create(interaction: discord.Interaction) -> None:
         )
         return
     await interaction.response.send_modal(PlayerCVModal())
-
-
-bot.tree.add_command(cv_group)
-
-
-crew_group = app_commands.Group(
-    name="equipage",
-    description="Crée et gère ton équipage permanent.",
-)
 
 
 def member_level(guild_id: int, user_id: int) -> int:
@@ -3050,7 +3063,7 @@ async def update_crew_presentation(guild: discord.Guild, crew_id: int) -> None:
         connection.commit()
 
 
-@crew_group.command(name="creer", description="Crée ton équipage permanent.")
+@bot.tree.command(name="equipage-creer", description="Crée ton équipage permanent.")
 @app_commands.describe(nom="Nom de l'équipage")
 async def crew_create(interaction: discord.Interaction, nom: str) -> None:
     if interaction.guild is None or not isinstance(interaction.user, discord.Member):
@@ -3291,8 +3304,8 @@ class CrewRecruitmentModal(discord.ui.Modal):
         )
 
 
-@crew_group.command(
-    name="recrutement",
+@bot.tree.command(
+    name="equipage-recrutement",
     description="Publie l'annonce de recrutement de ton équipage.",
 )
 async def crew_recruitment(interaction: discord.Interaction) -> None:
@@ -3490,7 +3503,7 @@ class CrewRecruitmentView(discord.ui.View):
         ).fetchone()
         if cv is None:
             await interaction.response.send_message(
-                f"Tu dois d'abord créer ton CV avec `/cv creer` dans "
+                f"Tu dois d'abord créer ton CV avec `/cv-creer` dans "
                 f"`{PLAYER_CV_CHANNEL_NAME}`.",
                 ephemeral=True,
             )
@@ -3580,7 +3593,7 @@ class CrewRecruitmentView(discord.ui.View):
         )
 
 
-@crew_group.command(name="quitter", description="Quitte ton équipage.")
+@bot.tree.command(name="equipage-quitter", description="Quitte ton équipage.")
 async def crew_leave(interaction: discord.Interaction) -> None:
     if interaction.guild is None or not isinstance(interaction.user, discord.Member):
         return
@@ -3600,7 +3613,7 @@ async def crew_leave(interaction: discord.Interaction) -> None:
         return
     if row[1] == interaction.user.id:
         await interaction.response.send_message(
-            "Le propriétaire doit utiliser `/equipage supprimer`.", ephemeral=True
+            "Le propriétaire doit utiliser `/equipage-supprimer`.", ephemeral=True
         )
         return
     connection.execute(
@@ -3617,7 +3630,7 @@ async def crew_leave(interaction: discord.Interaction) -> None:
     )
 
 
-@crew_group.command(name="supprimer", description="Supprime ton équipage.")
+@bot.tree.command(name="equipage-supprimer", description="Supprime ton équipage.")
 async def crew_delete(interaction: discord.Interaction) -> None:
     if interaction.guild is None:
         return
@@ -3707,9 +3720,6 @@ async def crew_delete(interaction: discord.Interaction) -> None:
     await interaction.followup.send(
         f"L'équipage **{row[1]}** a été supprimé.", ephemeral=True
     )
-
-
-bot.tree.add_command(crew_group)
 
 
 def active_trade_for(guild_id: int, user_id: int) -> tuple | None:
@@ -3865,8 +3875,8 @@ class TradeOfferView(discord.ui.View):
                     f"**Recherche :** {post[2]}\n\n"
                     "Discutez ici sans partager d'identifiants ni accepter de promesse "
                     "hors de la fenêtre officielle du jeu.\n\n"
-                    "À la fin, chacun utilise `/trade avis`. Après les deux avis, "
-                    "le salon se ferme. Utilisez `/trade fermer` si le trade est annulé."
+                    "À la fin, chacun utilise `/trade-avis`. Après les deux avis, "
+                    "le salon se ferme. Utilisez `/trade-fermer` si le trade est annulé."
                 ),
                 colour=discord.Colour.teal(),
             )
@@ -3876,12 +3886,7 @@ class TradeOfferView(discord.ui.View):
         )
 
 
-trade_group = app_commands.Group(
-    name="trade", description="Publie et finalise des trades sécurisés."
-)
-
-
-@trade_group.command(name="publier", description="Publie une offre sur le marché.")
+@bot.tree.command(name="trade-publier", description="Publie une offre sur le marché.")
 @app_commands.describe(
     proposition="Ce que tu proposes, emojis personnalisés acceptés",
     recherche="Ce que tu recherches, emojis personnalisés acceptés",
@@ -3944,7 +3949,7 @@ async def trade_publish(
     )
 
 
-@trade_group.command(name="avis", description="Évalue l'autre participant du trade.")
+@bot.tree.command(name="trade-avis", description="Évalue l'autre participant du trade.")
 @app_commands.describe(etoiles="Note de 1 à 5", commentaire="Commentaire sur le trade")
 async def trade_review(
     interaction: discord.Interaction,
@@ -4003,7 +4008,7 @@ async def trade_review(
         await close_trade_deal(interaction.channel, "completed", interaction.user)
 
 
-@trade_group.command(name="fermer", description="Ferme un trade non terminé.")
+@bot.tree.command(name="trade-fermer", description="Ferme un trade non terminé.")
 @app_commands.describe(raison="Pourquoi le trade n'a pas été terminé")
 async def trade_close(
     interaction: discord.Interaction, raison: str = "Trade annulé"
@@ -4032,7 +4037,7 @@ async def trade_close(
     await close_trade_deal(interaction.channel, "cancelled", interaction.user)
 
 
-@trade_group.command(name="profil", description="Affiche la réputation de trade.")
+@bot.tree.command(name="trade-profil", description="Affiche la réputation de trade.")
 async def trade_profile(
     interaction: discord.Interaction, membre: discord.Member | None = None
 ) -> None:
@@ -4059,9 +4064,6 @@ async def trade_profile(
             colour=discord.Colour.gold(),
         )
     )
-
-
-bot.tree.add_command(trade_group)
 
 
 async def send_sanction_log(
@@ -4159,13 +4161,19 @@ async def warn_command(
         pass
 
 
-@bot.tree.command(name="warnings", description="Affiche les avertissements d'un membre.")
-@app_commands.default_permissions(moderate_members=True)
-@app_commands.checks.has_permissions(moderate_members=True)
+@bot.tree.command(name="warns", description="Affiche les avertissements d'un membre.")
 async def warnings_command(
     interaction: discord.Interaction, membre: discord.Member
 ) -> None:
-    if interaction.guild is None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not is_ticket_staff(interaction.user) and not is_helper(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée aux helpers et au staff.", ephemeral=True
+        )
         return
     rows = require_database().execute(
         """
@@ -4190,7 +4198,10 @@ async def warnings_command(
     )
 
 
-@bot.tree.command(name="unwarn", description="Retire un avertissement par son numéro.")
+@bot.tree.command(
+    name="warn-retirer",
+    description="Retire un avertissement par son numéro.",
+)
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 async def unwarn_command(interaction: discord.Interaction, identifiant: int) -> None:
@@ -4261,7 +4272,10 @@ async def timeout_command(
     )
 
 
-@bot.tree.command(name="untimeout", description="Retire le timeout d'un membre.")
+@bot.tree.command(
+    name="timeout-retirer",
+    description="Retire le timeout d'un membre.",
+)
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 async def untimeout_command(
@@ -4315,6 +4329,176 @@ async def sanctions_command(
         ),
         ephemeral=True,
     )
+
+
+@bot.tree.command(
+    name="infos-joueur",
+    description="Affiche les informations utiles sur un membre.",
+)
+async def player_info_command(
+    interaction: discord.Interaction, membre: discord.Member
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.user, discord.Member)
+    ):
+        return
+    if not is_ticket_staff(interaction.user) and not is_helper(interaction.user):
+        await interaction.response.send_message(
+            "Cette commande est réservée aux helpers et au staff.", ephemeral=True
+        )
+        return
+    message_xp, voice_xp, bonus_xp, voice_seconds, total_messages = (
+        get_member_stats(interaction.guild.id, membre.id)
+    )
+    total_xp = message_xp + voice_xp + bonus_xp
+    warning_count = require_database().execute(
+        """
+        SELECT COUNT(*) FROM warnings
+        WHERE guild_id = ? AND user_id = ? AND active = 1
+        """,
+        (interaction.guild.id, membre.id),
+    ).fetchone()[0]
+    sanction_count = require_database().execute(
+        """
+        SELECT COUNT(*) FROM sanctions
+        WHERE guild_id = ? AND user_id = ?
+        """,
+        (interaction.guild.id, membre.id),
+    ).fetchone()[0]
+    created_timestamp = int(membre.created_at.timestamp())
+    joined_timestamp = (
+        int(membre.joined_at.timestamp()) if membre.joined_at is not None else None
+    )
+    roles = [
+        role.mention for role in reversed(membre.roles[1:]) if not role.is_default()
+    ]
+    embed = discord.Embed(
+        title=f"🔎 Informations • {membre.display_name}",
+        colour=membre.colour if membre.colour.value else discord.Colour.blue(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    embed.set_thumbnail(url=membre.display_avatar.url)
+    embed.add_field(
+        name="Identité",
+        value=(
+            f"Compte : {membre.mention}\n"
+            f"Identifiant : `{membre.id}`\n"
+            f"Bot : **{'Oui' if membre.bot else 'Non'}**"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Dates",
+        value=(
+            f"Compte créé : <t:{created_timestamp}:F> • <t:{created_timestamp}:R>\n"
+            + (
+                f"Serveur rejoint : <t:{joined_timestamp}:F> • "
+                f"<t:{joined_timestamp}:R>"
+                if joined_timestamp is not None
+                else "Date d'arrivée indisponible"
+            )
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Activité",
+        value=(
+            f"Niveau : **{calculate_level(total_xp)}** • XP : **{total_xp:,}**\n"
+            f"Messages comptabilisés : **{total_messages:,}**\n"
+            f"Temps vocal : **{format_duration(voice_seconds)}**\n"
+            f"Invitations : **{get_invite_count(interaction.guild.id, membre.id)}**"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Modération",
+        value=(
+            f"Warns actifs : **{warning_count}**\n"
+            f"Sanctions enregistrées : **{sanction_count}**\n"
+            f"Timeout actuel : "
+            f"**{'Oui' if membre.is_timed_out() else 'Non'}**"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name=f"Rôles ({len(roles)})",
+        value=(" ".join(roles)[:1024] if roles else "Aucun rôle"),
+        inline=False,
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="admin-commandes",
+    description="Publie la liste des commandes d'administration.",
+)
+@app_commands.default_permissions(administrator=True)
+@app_commands.checks.has_permissions(administrator=True)
+async def admin_commands_command(interaction: discord.Interaction) -> None:
+    embed = discord.Embed(
+        title="🛠️ Commandes d'administration de RadarokBot",
+        description=(
+            "Toutes les commandes sensibles utilisent des tirets et sont protégées "
+            "par les permissions Discord et les vérifications du bot."
+        ),
+        colour=discord.Colour.red(),
+    )
+    embed.add_field(
+        name="⚖️ Modération",
+        value=(
+            "`/warn` • ajouter un avertissement\n"
+            "`/warns` • consulter les warns — accessible aux helpers\n"
+            "`/warn-retirer` • retirer un avertissement\n"
+            "`/timeout` • placer un membre en timeout\n"
+            "`/timeout-retirer` • retirer un timeout\n"
+            "`/sanctions` • historique complet\n"
+            "`/infos-joueur` • informations — accessible aux helpers"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🎉 Giveaways",
+        value=(
+            "`/giveaway-creer`\n"
+            "`/giveaway-terminer`\n"
+            "`/giveaway-reroll`\n"
+            "`/giveaway-annuler`"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🎪 Événements",
+        value=(
+            "`/evenement-creer`\n"
+            "`/evenement-annuler`\n"
+            "`/evenement-terminer`\n"
+            "`/evenement-resultats`"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="📊 Niveaux et invitations",
+        value=(
+            "`/niveau-donner`\n"
+            "`/niveau-reinitialiser`\n"
+            "`/invites-definir`"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🎫 Gestion par boutons",
+        value=(
+            "Claim, fermeture et transmission des tickets ; acceptation ou refus "
+            "des candidatures d'équipages ; contrôles persistants des événements "
+            "et giveaways."
+        ),
+        inline=False,
+    )
+    embed.set_footer(
+        text="Le rôle Helper ne possède aucune autre commande de modération"
+    )
+    await interaction.response.send_message(embed=embed)
 
 
 class CommunityEventView(discord.ui.View):
@@ -4433,12 +4617,10 @@ class CommunityEventView(discord.ui.View):
         )
 
 
-event_group = app_commands.Group(
-    name="evenement", description="Crée et gère les événements communautaires."
+@bot.tree.command(
+    name="evenement-creer",
+    description="Crée un événement avec inscriptions.",
 )
-
-
-@event_group.command(name="creer", description="Crée un événement avec inscriptions.")
 @app_commands.default_permissions(manage_events=True)
 @app_commands.checks.has_permissions(manage_events=True)
 @app_commands.describe(
@@ -4522,7 +4704,7 @@ async def event_create(
     )
 
 
-@event_group.command(name="annuler", description="Annule un événement.")
+@bot.tree.command(name="evenement-annuler", description="Annule un événement.")
 @app_commands.default_permissions(manage_events=True)
 @app_commands.checks.has_permissions(manage_events=True)
 async def event_cancel(
@@ -4563,7 +4745,7 @@ async def event_cancel(
     await interaction.response.send_message("Événement annulé.", ephemeral=True)
 
 
-@event_group.command(name="terminer", description="Clôture un événement terminé.")
+@bot.tree.command(name="evenement-terminer", description="Clôture un événement terminé.")
 @app_commands.default_permissions(manage_events=True)
 @app_commands.checks.has_permissions(manage_events=True)
 async def event_finish(
@@ -4603,8 +4785,8 @@ async def event_finish(
     await interaction.response.send_message("Événement clôturé.", ephemeral=True)
 
 
-@event_group.command(
-    name="resultats",
+@bot.tree.command(
+    name="evenement-resultats",
     description="Publie le podium et attribue les rôles de l'événement.",
 )
 @app_commands.default_permissions(manage_events=True)
@@ -4681,9 +4863,6 @@ async def event_results(
     await interaction.followup.send(
         "Podium publié et rôles attribués.", ephemeral=True
     )
-
-
-bot.tree.add_command(event_group)
 
 
 @bot.tree.command(
@@ -4845,7 +5024,7 @@ async def invites_command(
 
 
 @bot.tree.command(
-    name="invites-set",
+    name="invites-definir",
     description="Définit le nombre exact d'invitations d'un membre.",
 )
 @app_commands.guild_only()
@@ -5139,7 +5318,7 @@ async def give_levels_command(
 
 
 @bot.tree.command(
-    name="niveau-reset",
+    name="niveau-reinitialiser",
     description="Remet à zéro le niveau et l'XP d'un membre.",
 )
 @app_commands.guild_only()
@@ -5673,12 +5852,12 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 embed=discord.Embed(
                     title="🤝 Marché sécurisé des trades",
                     description=(
-                        "Publie une offre avec `/trade publier` en indiquant ce que tu "
+                        "Publie une offre avec `/trade-publier` en indiquant ce que tu "
                         "proposes et recherches. Tu peux coller les emojis personnalisés "
                         "du serveur dans les deux champs.\n\n"
                         "Une personne intéressée clique sur le bouton : un salon privé "
                         "est alors créé. Chaque participant ne peut avoir qu'un seul "
-                        "trade actif. À la fin, utilisez `/trade avis` ou `/trade fermer`."
+                        "trade actif. À la fin, utilisez `/trade-avis` ou `/trade-fermer`."
                     ),
                     colour=discord.Colour.teal(),
                 )
@@ -5689,7 +5868,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 title="📄 Crée ton CV de joueur",
                 description=(
                     "Aucun message normal n'est autorisé dans ce salon.\n\n"
-                    "Utilise uniquement **`/cv creer`** : le bot ouvrira un formulaire "
+                    "Utilise uniquement **`/cv-creer`** : le bot ouvrira un formulaire "
                     "privé puis publiera ton CV à ta place. Relance la même commande "
                     "pour modifier ton CV existant."
                 ),
@@ -5719,7 +5898,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 embed=discord.Embed(
                     title="📋 Présentation des équipages",
                     description=(
-                        "Chaque équipage créé avec `/equipage creer` apparaît "
+                        "Chaque équipage créé avec `/equipage-creer` apparaît "
                         "automatiquement ici avec son capitaine et son nombre de "
                         "membres. Les présentations sont mises à jour par le bot."
                     ),
@@ -5733,10 +5912,10 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                     title="📢 Recrutements d'équipages",
                     description=(
                         "Aucun message normal n'est autorisé dans ce salon.\n\n"
-                        "Les capitaines publient avec **`/equipage recrutement`**. "
+                        "Les capitaines publient avec **`/equipage-recrutement`**. "
                         "Le bot ouvre un formulaire puis envoie l'annonce avec un "
                         "bouton **Postuler**.\n\n"
-                        "Pour postuler, tu dois avoir créé ton CV avec `/cv creer`. "
+                        "Pour postuler, tu dois avoir créé ton CV avec `/cv-creer`. "
                         "Un salon privé sera ensuite ouvert avec le capitaine."
                     ),
                     colour=discord.Colour.gold(),
@@ -6020,7 +6199,7 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         name="🔗 Invitations et boosters",
         value=(
             "Comptage des invitations, attribution automatique des quatre rôles de "
-            "recrutement, `/invites`, `/invites-set` et remerciement automatique "
+            "recrutement, `/invites`, `/invites-definir` et remerciement automatique "
             "des membres qui boostent."
         ),
         inline=False,
@@ -6152,6 +6331,11 @@ async def setup_hook() -> None:
         event_reminder_loop.start()
     if not clip_rules_reminder_loop.is_running():
         clip_rules_reminder_loop.start()
+    if GUILD_ID:
+        guild_object = discord.Object(id=int(GUILD_ID))
+        bot.tree.copy_global_to(guild=guild_object)
+        bot.tree.clear_commands(guild=None)
+        await bot.tree.sync()
 
 
 @bot.event
@@ -6886,6 +7070,7 @@ async def on_ready() -> None:
         return
 
     for guild in bot.guilds:
+        await ensure_helper_role(guild)
         await update_server_stats(guild)
         await refresh_invite_cache(guild)
         await restore_invite_roles(guild)
@@ -6916,7 +7101,6 @@ async def on_ready() -> None:
 
     if GUILD_ID:
         guild_object = discord.Object(id=int(GUILD_ID))
-        bot.tree.copy_global_to(guild=guild_object)
         synced = await bot.tree.sync(guild=guild_object)
         scope = f"le serveur {GUILD_ID}"
     else:
