@@ -110,6 +110,8 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
   permission sensible.
 - Lorsqu'un helper claim un ticket, les autres helpers n'y ont plus accès. Le
   staff supérieur conserve toujours l'accès.
+- Chaque claim est envoyé dans `📨・tickets-staff` avec le ticket, son auteur,
+  le membre du staff assigné, ainsi que la date et l'heure exactes.
 - Le helper peut clôturer le ticket ou le faire remonter au staff supérieur.
 - Un ticket résolu rapporte un point au helper assigné et actualise le
   classement des helpers.
@@ -183,6 +185,11 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 - `/sanctions` affiche l'historique enregistré d'un membre.
 - Les arrivées/départs, mouvements vocaux, messages supprimés, messages
   modifiés, sanctions et transcriptions possèdent chacun leur propre salon.
+- `🧾・logs-discord` est créé automatiquement au démarrage et journalise les
+  actions du staff issues de l'audit Discord : déplacements et déconnexions
+  vocales, surnoms, salons, rôles, permissions, sanctions et autres changements.
+- Le bot doit posséder les permissions `Voir le journal d'audit` et
+  `Gérer les salons` pour assurer ce suivi et recréer le salon s'il est absent.
 
 ## Événements
 

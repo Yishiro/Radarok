@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-helper-automatique"
+BOT_UPDATE_VERSION = "2026.07.29-logs-discord-et-claims"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -387,6 +387,7 @@ SERVER_STRUCTURE = (
             ChannelSpec("🗑️・messages-supprimés"),
             ChannelSpec("✏️・messages-modifiés"),
             ChannelSpec("⚖️・sanctions"),
+            ChannelSpec("🧾・logs-discord"),
             ChannelSpec("📁・transcripts-tickets"),
         ),
         staff_only=True,
@@ -445,6 +446,8 @@ VOICE_LOG_CHANNEL_NAME = stylize_channel_name("🔊・logs-vocaux")
 DELETED_MESSAGE_LOG_CHANNEL_NAME = stylize_channel_name("🗑️・messages-supprimés")
 EDITED_MESSAGE_LOG_CHANNEL_NAME = stylize_channel_name("✏️・messages-modifiés")
 SANCTION_LOG_CHANNEL_NAME = stylize_channel_name("⚖️・sanctions")
+DISCORD_AUDIT_LOG_CHANNEL_NAME = stylize_channel_name("🧾・logs-discord")
+JOURNALS_CATEGORY_NAME = decorate_category_name("🛡️・JOURNAUX")
 COMMANDS_CHANNEL_NAME = stylize_channel_name("🤖・commandes-bots")
 TEMP_VOICE_CATEGORY_NAME = decorate_category_name("⚓・CRÉE TON ÉQUIPAGE")
 TEMP_VOICE_TRIGGER_NAME = stylize_channel_name("➕・Créer un vocal")
@@ -816,6 +819,10 @@ def initialize_database() -> None:
             message_id INTEGER NOT NULL,
             posted_at INTEGER NOT NULL,
             PRIMARY KEY (guild_id, version)
+        );
+        CREATE TABLE IF NOT EXISTS audit_log_state (
+            guild_id INTEGER PRIMARY KEY,
+            last_entry_id INTEGER NOT NULL DEFAULT 0
         );
         """
     )
@@ -1785,7 +1792,7 @@ class TicketControlView(discord.ui.View):
         connection = require_database()
         row = connection.execute(
             """
-            SELECT claimed_by, ticket_type, escalated FROM tickets
+            SELECT id, user_id, claimed_by, ticket_type, escalated FROM tickets
             WHERE channel_id = ? AND status = 'open'
             """,
             (interaction.channel.id,),
@@ -1795,14 +1802,20 @@ class TicketControlView(discord.ui.View):
                 "Ce ticket n'est plus actif.", ephemeral=True
             )
             return
-        if row[0] is not None and row[0] != interaction.user.id:
+        ticket_id, opener_id, claimed_by, ticket_type, escalated = row
+        if claimed_by is not None and claimed_by != interaction.user.id:
             await interaction.response.send_message(
-                f"Ce ticket est déjà pris en charge par <@{row[0]}>.",
+                f"Ce ticket est déjà pris en charge par <@{claimed_by}>.",
                 ephemeral=True,
             )
             return
+        if claimed_by == interaction.user.id:
+            await interaction.response.send_message(
+                "Tu as déjà pris ce ticket en charge.", ephemeral=True
+            )
+            return
         if is_helper(interaction.user) and not is_ticket_staff(interaction.user):
-            if row[1] not in {"assistance", "signalement"} or row[2]:
+            if ticket_type not in {"assistance", "signalement"} or escalated:
                 await interaction.response.send_message(
                     "Ce ticket est réservé au staff supérieur.", ephemeral=True
                 )
@@ -1836,6 +1849,53 @@ class TicketControlView(discord.ui.View):
         await interaction.response.send_message(
             f"🙋 Ticket pris en charge par {interaction.user.mention}."
         )
+        log_channel = discord.utils.get(
+            interaction.guild.text_channels, name=TICKET_LOG_CHANNEL_NAME
+        )
+        if log_channel is not None:
+            claimed_at = datetime.now(timezone.utc)
+            claimed_timestamp = int(claimed_at.timestamp())
+            embed = discord.Embed(
+                title=f"🙋 Ticket #{ticket_id} pris en charge",
+                colour=discord.Colour.blurple(),
+                timestamp=claimed_at,
+            )
+            embed.add_field(
+                name="Ticket",
+                value=(
+                    f"{interaction.channel.mention}\n"
+                    f"Type : **{ticket_type.replace('-', ' ').title()}**"
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name="Membre concerné",
+                value=f"<@{opener_id}>\n`{opener_id}`",
+                inline=True,
+            )
+            embed.add_field(
+                name="Pris en charge par",
+                value=(
+                    f"{interaction.user.mention}\n"
+                    f"`{interaction.user.id}`"
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name="Date et heure exactes",
+                value=(
+                    f"<t:{claimed_timestamp}:F>\n"
+                    f"(<t:{claimed_timestamp}:R>)"
+                ),
+                inline=False,
+            )
+            try:
+                await log_channel.send(embed=embed)
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible de journaliser le claim du ticket %s",
+                    ticket_id,
+                )
 
     @discord.ui.button(
         label="Faire remonter",
@@ -6451,6 +6511,274 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
         )
 
 
+async def ensure_discord_audit_log_channel(
+    guild: discord.Guild,
+) -> discord.TextChannel | None:
+    channel = discord.utils.get(
+        guild.text_channels, name=DISCORD_AUDIT_LOG_CHANNEL_NAME
+    )
+    if channel is not None:
+        return channel
+    bot_member = guild.me
+    if bot_member is None:
+        return None
+    overwrites: dict[
+        discord.Role | discord.Member, discord.PermissionOverwrite
+    ] = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        bot_member: discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            manage_channels=True,
+        ),
+    }
+    for role in guild.roles:
+        if role.name in STAFF_ROLE_NAMES:
+            overwrites[role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+            )
+    category = discord.utils.get(
+        guild.categories, name=JOURNALS_CATEGORY_NAME
+    )
+    try:
+        if category is None:
+            category = await guild.create_category(
+                JOURNALS_CATEGORY_NAME,
+                overwrites=overwrites,
+                reason="Création automatique de la catégorie des journaux",
+            )
+        return await guild.create_text_channel(
+            DISCORD_AUDIT_LOG_CHANNEL_NAME,
+            category=category,
+            overwrites=overwrites,
+            reason="Création automatique du journal d'audit Discord",
+        )
+    except discord.Forbidden:
+        logging.warning(
+            "Permissions insuffisantes pour créer les logs Discord sur %s",
+            guild.id,
+        )
+    except discord.HTTPException:
+        logging.exception(
+            "Impossible de créer les logs Discord sur %s", guild.id
+        )
+    return None
+
+
+AUDIT_ACTION_LABELS = {
+    "guild_update": "Serveur modifié",
+    "channel_create": "Salon créé",
+    "channel_update": "Salon renommé ou modifié",
+    "channel_delete": "Salon supprimé",
+    "overwrite_create": "Permission de salon ajoutée",
+    "overwrite_update": "Permission de salon modifiée",
+    "overwrite_delete": "Permission de salon supprimée",
+    "kick": "Membre expulsé",
+    "ban": "Membre banni",
+    "unban": "Membre débanni",
+    "member_update": "Profil d'un membre modifié",
+    "member_role_update": "Rôles d'un membre modifiés",
+    "member_move": "Membre déplacé en vocal",
+    "member_disconnect": "Membre déconnecté d'un vocal",
+    "bot_add": "Bot ajouté",
+    "role_create": "Rôle créé",
+    "role_update": "Rôle modifié",
+    "role_delete": "Rôle supprimé",
+    "invite_create": "Invitation créée",
+    "invite_update": "Invitation modifiée",
+    "invite_delete": "Invitation supprimée",
+    "webhook_create": "Webhook créé",
+    "webhook_update": "Webhook modifié",
+    "webhook_delete": "Webhook supprimé",
+    "emoji_create": "Emoji créé",
+    "emoji_update": "Emoji modifié",
+    "emoji_delete": "Emoji supprimé",
+    "sticker_create": "Sticker créé",
+    "sticker_update": "Sticker modifié",
+    "sticker_delete": "Sticker supprimé",
+    "thread_create": "Fil créé",
+    "thread_update": "Fil modifié",
+    "thread_delete": "Fil supprimé",
+    "message_delete": "Message supprimé par le staff",
+    "message_bulk_delete": "Messages supprimés en masse",
+    "message_pin": "Message épinglé",
+    "message_unpin": "Message désépinglé",
+}
+
+
+def describe_audit_target(target: object) -> str:
+    target_id = getattr(target, "id", None)
+    mention = getattr(target, "mention", None)
+    name = (
+        getattr(target, "display_name", None)
+        or getattr(target, "name", None)
+        or str(target)
+    )
+    description = str(mention or name)
+    if target_id is not None:
+        description += f"\n`{target_id}`"
+    return description[:1024]
+
+
+def format_audit_value(value: object) -> str:
+    if value is None:
+        return "Aucun"
+    if isinstance(value, (list, tuple, set)):
+        labels = [
+            getattr(item, "name", None) or str(item) for item in value
+        ]
+        return ", ".join(labels)[:300] or "Aucun"
+    return str(getattr(value, "name", value))[:300]
+
+
+def audit_changes_summary(entry: discord.AuditLogEntry) -> str | None:
+    field_labels = {
+        "name": "Nom",
+        "nick": "Surnom",
+        "topic": "Sujet",
+        "position": "Position",
+        "user_limit": "Limite utilisateurs",
+        "roles": "Rôles",
+        "permissions": "Permissions",
+        "slowmode_delay": "Mode lent",
+        "nsfw": "NSFW",
+        "bitrate": "Débit",
+        "communication_disabled_until": "Timeout",
+    }
+    lines: list[str] = []
+    for attribute, label in field_labels.items():
+        old_value = getattr(entry.before, attribute, None)
+        new_value = getattr(entry.after, attribute, None)
+        if old_value == new_value or (old_value is None and new_value is None):
+            continue
+        lines.append(
+            f"**{label} :** `{format_audit_value(old_value)}` → "
+            f"`{format_audit_value(new_value)}`"
+        )
+        if len(lines) >= 6:
+            break
+    return "\n".join(lines)[:1024] if lines else None
+
+
+async def send_discord_audit_entry(
+    guild: discord.Guild,
+    channel: discord.TextChannel,
+    entry: discord.AuditLogEntry,
+) -> None:
+    actor = entry.user
+    if actor is None or actor.id == getattr(bot.user, "id", None):
+        return
+    actor_member = guild.get_member(actor.id)
+    if actor_member is None or not is_ticket_staff(actor_member):
+        return
+    action_name = entry.action.name
+    action_label = AUDIT_ACTION_LABELS.get(
+        action_name, action_name.replace("_", " ").title()
+    )
+    embed = discord.Embed(
+        title=f"🧾 {action_label}",
+        colour=discord.Colour.dark_gold(),
+        timestamp=entry.created_at,
+    )
+    embed.add_field(
+        name="Action effectuée par",
+        value=f"{actor_member.mention}\n`{actor_member.id}`",
+        inline=True,
+    )
+    if entry.target is not None:
+        embed.add_field(
+            name="Élément concerné",
+            value=describe_audit_target(entry.target),
+            inline=True,
+        )
+    extra_channel = getattr(entry.extra, "channel", None)
+    if extra_channel is not None:
+        embed.add_field(
+            name="Salon concerné",
+            value=describe_audit_target(extra_channel),
+            inline=True,
+        )
+    count = getattr(entry.extra, "count", None)
+    if count is not None:
+        embed.add_field(name="Nombre", value=str(count), inline=True)
+    changes = audit_changes_summary(entry)
+    if changes:
+        embed.add_field(name="Modifications", value=changes, inline=False)
+    embed.add_field(
+        name="Date et heure exactes",
+        value=f"<t:{int(entry.created_at.timestamp())}:F>",
+        inline=False,
+    )
+    if entry.reason:
+        embed.add_field(name="Raison", value=entry.reason[:1024], inline=False)
+    embed.set_footer(text=f"ID audit : {entry.id}")
+    await channel.send(embed=embed)
+
+
+@tasks.loop(seconds=10)
+async def discord_audit_log_loop() -> None:
+    connection = require_database()
+    for guild in bot.guilds:
+        channel = await ensure_discord_audit_log_channel(guild)
+        if channel is None:
+            continue
+        state = connection.execute(
+            "SELECT last_entry_id FROM audit_log_state WHERE guild_id = ?",
+            (guild.id,),
+        ).fetchone()
+        try:
+            entries = [entry async for entry in guild.audit_logs(limit=100)]
+        except discord.Forbidden:
+            logging.warning(
+                "Permission Voir le journal d'audit manquante sur %s", guild.id
+            )
+            continue
+        except discord.HTTPException:
+            logging.exception(
+                "Impossible de lire le journal d'audit sur %s", guild.id
+            )
+            continue
+        if not entries:
+            continue
+        newest_id = max(entry.id for entry in entries)
+        if state is None:
+            connection.execute(
+                """
+                INSERT INTO audit_log_state (guild_id, last_entry_id)
+                VALUES (?, ?)
+                """,
+                (guild.id, newest_id),
+            )
+            connection.commit()
+            continue
+        last_entry_id = state[0]
+        for entry in sorted(entries, key=lambda current: current.id):
+            if entry.id <= last_entry_id:
+                continue
+            try:
+                await send_discord_audit_entry(guild, channel, entry)
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible d'envoyer l'entrée d'audit %s", entry.id
+                )
+        connection.execute(
+            """
+            UPDATE audit_log_state SET last_entry_id = ?
+            WHERE guild_id = ?
+            """,
+            (newest_id, guild.id),
+        )
+        connection.commit()
+
+
+@discord_audit_log_loop.before_loop
+async def before_discord_audit_log_loop() -> None:
+    await bot.wait_until_ready()
+
+
 async def _setup_error(
     interaction: discord.Interaction, error: app_commands.AppCommandError
 ) -> None:
@@ -6600,7 +6928,9 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         name="⚖️ Modération et journaux",
         value=(
             "Warns, timeouts, historique des sanctions et journaux séparés pour "
-            "les messages, vocaux, arrivées, départs et tickets."
+            "les messages, vocaux, arrivées, départs et tickets. Le nouveau journal "
+            "Discord identifie précisément les actions du staff, et chaque claim de "
+            "ticket conserve son auteur, sa date et son heure."
         ),
         inline=False,
     )
@@ -6822,6 +7152,8 @@ async def setup_hook() -> None:
         event_reminder_loop.start()
     if not clip_rules_reminder_loop.is_running():
         clip_rules_reminder_loop.start()
+    if not discord_audit_log_loop.is_running():
+        discord_audit_log_loop.start()
     if GUILD_ID:
         guild_object = discord.Object(id=int(GUILD_ID))
         bot.tree.copy_global_to(guild=guild_object)
