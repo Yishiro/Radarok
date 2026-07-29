@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-tickets-staff-superieur"
+BOT_UPDATE_VERSION = "2026.07.29-clear-messages"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -5267,6 +5267,125 @@ class SanctionUndoView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=None)
 
 
+@bot.tree.command(
+    name="clear",
+    description="Supprime un nombre précis de messages récents.",
+)
+@app_commands.describe(
+    nombre="Nombre de messages à supprimer, entre 1 et 500",
+    membre="Supprimer uniquement les messages de ce membre",
+)
+@app_commands.default_permissions(manage_messages=True)
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear_messages_command(
+    interaction: discord.Interaction,
+    nombre: app_commands.Range[int, 1, 500],
+    membre: discord.Member | None = None,
+) -> None:
+    if (
+        interaction.guild is None
+        or not isinstance(interaction.channel, discord.TextChannel)
+        or not isinstance(interaction.user, discord.Member)
+        or not is_ticket_staff(interaction.user)
+        or is_helper(interaction.user)
+    ):
+        await interaction.response.send_message(
+            "Cette commande est réservée au staff de modération.",
+            ephemeral=True,
+        )
+        return
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    selected = 0
+
+    def message_matches(message: discord.Message) -> bool:
+        nonlocal selected
+        if selected >= nombre or message.pinned:
+            return False
+        if membre is not None and message.author.id != membre.id:
+            return False
+        selected += 1
+        return True
+
+    scan_limit = (
+        min(2500, max(500, nombre * 5))
+        if membre is None
+        else min(5000, max(500, nombre * 20))
+    )
+    try:
+        deleted = await interaction.channel.purge(
+            limit=scan_limit,
+            check=message_matches,
+            bulk=True,
+            reason=(
+                f"Clear de {nombre} message(s) par {interaction.user}"
+                + (f" pour {membre}" if membre is not None else "")
+            ),
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "Discord refuse la suppression. Vérifie la permission "
+            "**Gérer les messages** du bot.",
+            ephemeral=True,
+        )
+        return
+    except discord.HTTPException:
+        logging.exception(
+            "Impossible d'effectuer le clear dans le salon %s",
+            interaction.channel.id,
+        )
+        await interaction.followup.send(
+            "Discord a rencontré une erreur pendant la suppression.",
+            ephemeral=True,
+        )
+        return
+
+    target_text = (
+        f" de {membre.mention}" if membre is not None else ""
+    )
+    await interaction.followup.send(
+        f"🧹 **{len(deleted)} message(s)**{target_text} supprimé(s) dans "
+        f"{interaction.channel.mention}. Les messages épinglés ont été conservés.",
+        ephemeral=True,
+    )
+    log_channel = discord.utils.get(
+        interaction.guild.text_channels, name=DISCORD_AUDIT_LOG_CHANNEL_NAME
+    )
+    if log_channel is not None:
+        embed = discord.Embed(
+            title="🧹 Messages supprimés par commande",
+            colour=discord.Colour.orange(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(
+            name="Effectué par",
+            value=f"{interaction.user.mention}\n`{interaction.user.id}`",
+            inline=True,
+        )
+        embed.add_field(
+            name="Salon",
+            value=interaction.channel.mention,
+            inline=True,
+        )
+        embed.add_field(
+            name="Résultat",
+            value=(
+                f"Demandés : **{nombre}**\n"
+                f"Supprimés : **{len(deleted)}**"
+            ),
+            inline=True,
+        )
+        if membre is not None:
+            embed.add_field(
+                name="Membre ciblé",
+                value=f"{membre.mention}\n`{membre.id}`",
+                inline=False,
+            )
+        try:
+            await log_channel.send(embed=embed)
+        except discord.HTTPException:
+            logging.exception("Impossible de journaliser la commande clear")
+
+
 async def send_sanction_log(
     guild: discord.Guild,
     *,
@@ -6078,6 +6197,7 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
             "`/warn` • ajouter un avertissement\n"
             "`/warns` • consulter les warns — accessible aux helpers\n"
             "`/warn-retirer` • retirer un avertissement\n"
+            "`/clear` • supprimer un nombre précis de messages\n"
             "`/timeout` • placer un membre en timeout\n"
             "`/timeout-retirer` • retirer un timeout\n"
             "`/sanctions` • historique complet\n"
@@ -8482,7 +8602,8 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         name="⚖️ Modération et journaux",
         value=(
             "Dossiers numérotés, annulation par bouton, notes internes, escalade "
-            "automatique des warns, statistiques mensuelles et journaux séparés pour "
+            "automatique des warns, clear limité avec filtre par membre, statistiques "
+            "mensuelles et journaux séparés pour "
             "les messages, vocaux, arrivées, départs et tickets. Le nouveau journal "
             "Discord identifie précisément les actions du staff, et chaque claim de "
             "ticket conserve son auteur, sa date et son heure."

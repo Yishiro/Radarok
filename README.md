@@ -189,6 +189,9 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 
 - `/warn`, `/warns` et `/warn-retirer` gèrent les avertissements persistants.
 - `/timeout` et `/timeout-retirer` gèrent les exclusions temporaires Discord.
+- `/clear nombre [membre]` supprime entre 1 et 500 messages récents, avec un
+  filtre facultatif par membre. Le nombre est toujours obligatoire, les messages
+  épinglés sont conservés et l'action est envoyée dans `🧾・logs-discord`.
 - `/sanctions` affiche l'historique enregistré d'un membre.
 - Chaque sanction reçoit un numéro de dossier et les warns/timeouts peuvent être
   annulés depuis leur bouton dans le journal.
