@@ -35,7 +35,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.08.04-serveur-unique"
+BOT_UPDATE_VERSION = "2026.08.04-setup-fiabilise"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -563,6 +563,7 @@ message_timestamps: defaultdict[
 ] = defaultdict(deque)
 invite_cache: dict[int, dict[str, int]] = {}
 voice_join_times: dict[tuple[int, int], float] = {}
+setup_in_progress_guilds: set[int] = set()
 
 
 def authorized_guilds() -> list[discord.Guild]:
@@ -2894,12 +2895,32 @@ async def delete_all_channels(guild: discord.Guild, reason: str) -> tuple[int, i
         and channel.id not in PRESERVED_SETUP_CHANNEL_IDS
     ]
 
+    deleted_channels = 0
+    deleted_categories = 0
     for channel in regular_channels:
-        await channel.delete(reason=reason)
+        try:
+            await channel.delete(reason=reason)
+            deleted_channels += 1
+        except discord.HTTPException as error:
+            logging.warning(
+                "Salon %s (%s) conservé pendant /setup : %s",
+                channel.name,
+                channel.id,
+                error,
+            )
     for category in categories:
-        await category.delete(reason=reason)
+        try:
+            await category.delete(reason=reason)
+            deleted_categories += 1
+        except discord.HTTPException as error:
+            logging.warning(
+                "Catégorie %s (%s) conservée pendant /setup : %s",
+                category.name,
+                category.id,
+                error,
+            )
 
-    return len(regular_channels), len(categories)
+    return deleted_channels, deleted_categories
 
 
 async def update_server_stats(guild: discord.Guild) -> None:
@@ -7470,8 +7491,14 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             "Cette commande doit être utilisée dans un serveur.", ephemeral=True
         )
         return
+    if guild.id in setup_in_progress_guilds:
+        await interaction.response.send_message(
+            "Un `/setup` est déjà en cours sur ce serveur.", ephemeral=True
+        )
+        return
 
     await interaction.response.defer(ephemeral=True, thinking=True)
+    setup_in_progress_guilds.add(guild.id)
     reason = f"Commande /setup lancée par {interaction.user} ({interaction.user.id})"
     created_categories = 0
     created_channels = 0
@@ -7492,6 +7519,12 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
     clips_channel: discord.TextChannel | None = None
     verification_channel: discord.TextChannel | None = None
     rules_channel: discord.TextChannel | None = None
+    community_was_enabled = "COMMUNITY" in guild.features
+    old_community_channels = tuple(
+        channel
+        for channel in (guild.rules_channel, guild.public_updates_channel)
+        if channel is not None
+    )
 
     try:
         await reset_dynamic_server_data(guild)
@@ -8172,6 +8205,37 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 view=RecruitmentPanelView(),
             )
 
+        if (
+            community_was_enabled
+            and rules_channel is not None
+            and changelog_channel is not None
+        ):
+            try:
+                await guild.edit(
+                    rules_channel=rules_channel,
+                    public_updates_channel=changelog_channel,
+                    reason="Restauration du mode Communauté après /setup",
+                )
+                for old_channel in old_community_channels:
+                    if (
+                        old_channel.id not in PRESERVED_SETUP_CHANNEL_IDS
+                        and old_channel.id
+                        not in {rules_channel.id, changelog_channel.id}
+                    ):
+                        try:
+                            await old_channel.delete(
+                                reason="Remplacement du salon Communauté par /setup"
+                            )
+                        except discord.HTTPException:
+                            logging.warning(
+                                "Ancien salon Communauté %s impossible à supprimer",
+                                old_channel.id,
+                            )
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible de remplacer les salons du mode Communauté"
+                )
+
         helper_role = await ensure_helper_role(guild)
         await ensure_superior_staff_area(guild)
         if helper_role is not None:
@@ -8214,6 +8278,8 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             f"Discord a refusé une opération (`{error.code}`) : `{error.text}`",
             ephemeral=True,
         )
+    finally:
+        setup_in_progress_guilds.discard(guild.id)
 
 
 async def ensure_discord_audit_log_channel(
@@ -8427,6 +8493,8 @@ async def send_discord_audit_entry(
 async def discord_audit_log_loop() -> None:
     connection = require_database()
     for guild in authorized_guilds():
+        if guild.id in setup_in_progress_guilds:
+            continue
         channel = await ensure_discord_audit_log_channel(guild)
         if channel is None:
             continue
