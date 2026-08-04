@@ -3,6 +3,10 @@
 Bot Discord communautaire de Radarok's World. La commande administrateur
 `/setup` reconstruit automatiquement la structure complète du serveur.
 
+Le bot est verrouillé sur le serveur Discord `1527707133255090378`. Il ne
+synchronise ses commandes et n'exécute ses automatisations que sur ce serveur ;
+il quitte automatiquement tout autre serveur auquel il serait invité.
+
 ## Installation
 
 1. Installe Python 3.11 ou une version plus récente.
@@ -21,8 +25,9 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
    ```
 
    - `DISCORD_TOKEN` : token disponible dans le portail développeur Discord.
-   - `DISCORD_GUILD_ID` : identifiant du serveur de test. Cela fait apparaître la
-     commande slash presque immédiatement.
+   - `DISCORD_GUILD_ID` : utilise `1527707133255090378`. L'identifiant autorisé
+     est également verrouillé dans le code afin d'empêcher l'utilisation du bot
+     sur un autre serveur.
 
 4. Dans le portail développeur, active **Server Members Intent** et
    **Message Content Intent** dans l'onglet `Bot`, puis invite le bot avec les

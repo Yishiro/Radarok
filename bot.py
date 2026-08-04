@@ -26,7 +26,8 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = os.getenv("DISCORD_GUILD_ID")
+AUTHORIZED_GUILD_ID = 1527707133255090378
+GUILD_ID = str(AUTHORIZED_GUILD_ID)
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "radarok.db"))
 RANK_ASSET_DIR = BASE_DIR / "assets" / "ranks"
 PRESERVED_SETUP_CHANNEL_IDS = {
@@ -34,7 +35,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.08.04-setup-complet"
+BOT_UPDATE_VERSION = "2026.08.04-serveur-unique"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -562,6 +563,10 @@ message_timestamps: defaultdict[
 ] = defaultdict(deque)
 invite_cache: dict[int, dict[str, int]] = {}
 voice_join_times: dict[tuple[int, int], float] = {}
+
+
+def authorized_guilds() -> list[discord.Guild]:
+    return [guild for guild in bot.guilds if guild.id == AUTHORIZED_GUILD_ID]
 
 
 def initialize_database() -> None:
@@ -8421,7 +8426,7 @@ async def send_discord_audit_entry(
 @tasks.loop(seconds=10)
 async def discord_audit_log_loop() -> None:
     connection = require_database()
-    for guild in bot.guilds:
+    for guild in authorized_guilds():
         channel = await ensure_discord_audit_log_channel(guild)
         if channel is None:
             continue
@@ -8929,7 +8934,11 @@ async def setup_hook() -> None:
 
 @bot.event
 async def on_message(message: discord.Message) -> None:
-    if message.guild is None or message.author.bot:
+    if (
+        message.guild is None
+        or message.guild.id != AUTHORIZED_GUILD_ID
+        or message.author.bot
+    ):
         return
     if await moderate_message(message):
         return
@@ -8944,7 +8953,7 @@ async def voice_xp_loop() -> None:
     entries: list[tuple[int, int]] = []
     rewarded_members: list[discord.Member] = []
 
-    for guild in bot.guilds:
+    for guild in authorized_guilds():
         for channel in guild.voice_channels:
             if channel == guild.afk_channel or channel.name == TEMP_VOICE_TRIGGER_NAME:
                 continue
@@ -9045,7 +9054,7 @@ async def before_giveaway_end_loop() -> None:
 async def event_reminder_loop() -> None:
     now = datetime.now(timezone.utc)
     connection = require_database()
-    for guild in bot.guilds:
+    for guild in authorized_guilds():
         channel = discord.utils.get(
             guild.text_channels, name=EVENT_ANNOUNCEMENT_CHANNEL_NAME
         )
@@ -9157,7 +9166,7 @@ async def clip_rules_reminder_loop() -> None:
         return
     slot = f"clips-{now.date().isoformat()}"
     connection = require_database()
-    for guild in bot.guilds:
+    for guild in authorized_guilds():
         channel = discord.utils.get(guild.text_channels, name=CLIPS_CHANNEL_NAME)
         if channel is None:
             continue
@@ -9212,7 +9221,7 @@ async def social_bump_loop() -> None:
         return
     slot = f"{now.date().isoformat()}-{now.hour:02d}"
     connection = require_database()
-    for guild in bot.guilds:
+    for guild in authorized_guilds():
         for channel_name, content in SOCIAL_BUMP_MESSAGES.items():
             channel = discord.utils.get(guild.text_channels, name=channel_name)
             if channel is None:
@@ -9332,6 +9341,8 @@ async def on_message_edit(before: discord.Message, after: discord.Message) -> No
 
 @bot.event
 async def on_member_join(member: discord.Member) -> None:
+    if member.guild.id != AUTHORIZED_GUILD_ID:
+        return
     await update_server_stats(member.guild)
     log_channel = discord.utils.get(
         member.guild.text_channels, name=JOIN_LEAVE_LOG_CHANNEL_NAME
@@ -9406,6 +9417,8 @@ async def on_member_join(member: discord.Member) -> None:
 
 @bot.event
 async def on_member_remove(member: discord.Member) -> None:
+    if member.guild.id != AUTHORIZED_GUILD_ID:
+        return
     await update_server_stats(member.guild)
     if is_helper(member):
         require_database().execute(
@@ -9442,6 +9455,8 @@ async def on_member_remove(member: discord.Member) -> None:
 async def on_member_update(
     before: discord.Member, after: discord.Member
 ) -> None:
+    if after.guild.id != AUTHORIZED_GUILD_ID:
+        return
     if before.roles != after.roles:
         superior_role = discord.utils.get(
             after.guild.roles, name=SUPERIOR_STAFF_ROLE_NAME
@@ -9502,19 +9517,21 @@ async def on_member_update(
 
 @bot.event
 async def on_guild_update(before: discord.Guild, after: discord.Guild) -> None:
+    if after.id != AUTHORIZED_GUILD_ID:
+        return
     if before.premium_subscription_count != after.premium_subscription_count:
         await update_server_stats(after)
 
 
 @bot.event
 async def on_invite_create(invite: discord.Invite) -> None:
-    if invite.guild is not None:
+    if invite.guild is not None and invite.guild.id == AUTHORIZED_GUILD_ID:
         await refresh_invite_cache(invite.guild)
 
 
 @bot.event
 async def on_invite_delete(invite: discord.Invite) -> None:
-    if invite.guild is not None:
+    if invite.guild is not None and invite.guild.id == AUTHORIZED_GUILD_ID:
         await refresh_invite_cache(invite.guild)
 
 
@@ -9524,7 +9541,7 @@ async def on_voice_state_update(
     before: discord.VoiceState,
     after: discord.VoiceState,
 ) -> None:
-    if member.bot:
+    if member.guild.id != AUTHORIZED_GUILD_ID or member.bot:
         return
 
     if before.channel != after.channel:
@@ -9693,7 +9710,21 @@ async def on_ready() -> None:
     if bot.user is None:
         return
 
-    for guild in bot.guilds:
+    for guild in tuple(bot.guilds):
+        if guild.id != AUTHORIZED_GUILD_ID:
+            logging.warning(
+                "Départ automatique du serveur non autorisé %s (%s)",
+                guild.name,
+                guild.id,
+            )
+            try:
+                await guild.leave()
+            except discord.HTTPException:
+                logging.exception(
+                    "Impossible de quitter le serveur non autorisé %s", guild.id
+                )
+
+    for guild in authorized_guilds():
         await ensure_superior_staff_area(guild)
         helper_role = await ensure_helper_role(guild)
         if helper_role is not None:
@@ -9750,6 +9781,19 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_guild_join(guild: discord.Guild) -> None:
+    if guild.id != AUTHORIZED_GUILD_ID:
+        logging.warning(
+            "Invitation refusée sur le serveur non autorisé %s (%s)",
+            guild.name,
+            guild.id,
+        )
+        try:
+            await guild.leave()
+        except discord.HTTPException:
+            logging.exception(
+                "Impossible de quitter le serveur non autorisé %s", guild.id
+            )
+        return
     await refresh_invite_cache(guild)
     guild_object = discord.Object(id=guild.id)
     bot.tree.copy_global_to(guild=guild_object)
