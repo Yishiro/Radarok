@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     1531939680004739132,
 }
 BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.07.29-clear-messages"
+BOT_UPDATE_VERSION = "2026.08.04-setup-complet"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -3440,6 +3440,28 @@ async def reset_dynamic_server_data(guild: discord.Guild) -> None:
         "UPDATE community_events SET status = 'cancelled' WHERE guild_id = ?",
         (guild.id,),
     )
+    connection.execute(
+        """
+        UPDATE tickets
+        SET status = 'closed', claimed_by = NULL, claimed_at = NULL,
+            closed_at = COALESCE(closed_at, ?)
+        WHERE guild_id = ? AND status = 'open'
+        """,
+        (int(time.time()), guild.id),
+    )
+    connection.execute(
+        "UPDATE giveaways SET status = 'cancelled' WHERE guild_id = ?",
+        (guild.id,),
+    )
+    suggestion_ids = connection.execute(
+        "SELECT id FROM suggestions WHERE guild_id = ?", (guild.id,)
+    ).fetchall()
+    for (suggestion_id,) in suggestion_ids:
+        connection.execute(
+            "DELETE FROM suggestion_votes WHERE suggestion_id = ?",
+            (suggestion_id,),
+        )
+    connection.execute("DELETE FROM suggestions WHERE guild_id = ?", (guild.id,))
     connection.commit()
 
 
@@ -7436,7 +7458,7 @@ async def reset_level_command(
 
 
 async def _setup_server_structure(interaction: discord.Interaction) -> None:
-    """Ancien outil de reconstruction, volontairement absent des commandes slash."""
+    """Reconstruit entièrement la structure communautaire du serveur."""
     guild = interaction.guild
     if guild is None:
         await interaction.response.send_message(
@@ -8145,6 +8167,12 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 view=RecruitmentPanelView(),
             )
 
+        helper_role = await ensure_helper_role(guild)
+        await ensure_superior_staff_area(guild)
+        if helper_role is not None:
+            await reconcile_helper_ticket_permissions(guild, helper_role)
+        await ensure_discord_audit_log_channel(guild)
+        await refresh_command_guides(guild)
         await update_helper_leaderboard(guild)
 
         fallback_message = (
@@ -8477,6 +8505,25 @@ async def _setup_error(
             logging.error("Impossible d'afficher l'erreur : le salon a été supprimé")
     else:
         await interaction.response.send_message(message, ephemeral=True)
+
+
+@bot.tree.command(
+    name="setup",
+    description="Reconstruit entièrement le serveur Radarok.",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(administrator=True)
+@app_commands.checks.has_permissions(administrator=True)
+async def setup_command(interaction: discord.Interaction) -> None:
+    await _setup_server_structure(interaction)
+
+
+@setup_command.error
+async def setup_command_error(
+    interaction: discord.Interaction,
+    error: app_commands.AppCommandError,
+) -> None:
+    await _setup_error(interaction, error)
 
 
 async def publish_bot_update(guild: discord.Guild) -> None:

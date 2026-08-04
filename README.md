@@ -1,7 +1,7 @@
 # RadarokBot
 
 Bot Discord communautaire de Radarok's World. La commande administrateur
-`/setup` a été retirée après la configuration initiale du serveur.
+`/setup` reconstruit automatiquement la structure complète du serveur.
 
 ## Installation
 
@@ -39,10 +39,11 @@ Bot Discord communautaire de Radarok's World. La commande administrateur
 
 ## Structure du serveur
 
-- L'ancien outil interne de configuration a créé la structure initiale. Il n'est
-  plus exposé comme commande Discord afin d'éviter une réinitialisation accidentelle.
-- Le salon Discord `1531432945888526376` est explicitement protégé et n'est
-  jamais supprimé par `/setup`.
+- `/setup` est strictement réservé aux administrateurs. Il supprime les salons
+  et catégories non protégés, ferme les données dynamiques devenues invalides,
+  puis recrée les rôles, permissions, salons, panneaux et messages automatiques.
+- Les salons Discord `1531432945888526376` et `1531939680004739132` sont
+  explicitement protégés et ne sont jamais supprimés par `/setup`.
 - Les permissions d'écriture sont appliquées salon par salon. Le règlement,
   l'accueil, les annonces, réseaux, panneaux, sondages, niveaux, giveaways,
   valeurs, stocks et mises à jour sont en lecture seule pour les membres.
