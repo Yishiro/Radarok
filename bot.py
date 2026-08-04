@@ -150,6 +150,12 @@ ROLE_SPECS = (
         True,
     ),
     RoleSpec(
+        "🔱・Staff supérieur",
+        0x8E44AD,
+        discord.Permissions.none(),
+        True,
+    ),
+    RoleSpec(
         "🔨・Modérateur",
         0x3498DB,
         discord.Permissions(
