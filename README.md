@@ -3,7 +3,7 @@
 Bot Discord communautaire de Radarok's World. La commande administrateur
 `/setup` reconstruit automatiquement la structure complète du serveur.
 
-Le bot est verrouillé sur le serveur Discord `1527707133255090378`. Il ne
+Le bot est verrouillé sur le serveur Discord `1535591159064301608`. Il ne
 synchronise ses commandes et n'exécute ses automatisations que sur ce serveur ;
 il quitte automatiquement tout autre serveur auquel il serait invité.
 
@@ -25,7 +25,7 @@ il quitte automatiquement tout autre serveur auquel il serait invité.
    ```
 
    - `DISCORD_TOKEN` : token disponible dans le portail développeur Discord.
-   - `DISCORD_GUILD_ID` : utilise `1527707133255090378`. L'identifiant autorisé
+   - `DISCORD_GUILD_ID` : utilise `1535591159064301608`. L'identifiant autorisé
      est également verrouillé dans le code afin d'empêcher l'utilisation du bot
      sur un autre serveur.
 

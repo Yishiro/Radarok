@@ -26,7 +26,7 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 TOKEN = os.getenv("DISCORD_TOKEN")
-AUTHORIZED_GUILD_ID = 1527707133255090378
+AUTHORIZED_GUILD_ID = 1535591159064301608
 GUILD_ID = str(AUTHORIZED_GUILD_ID)
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "radarok.db"))
 RANK_ASSET_DIR = BASE_DIR / "assets" / "ranks"
