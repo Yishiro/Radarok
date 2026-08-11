@@ -26,16 +26,15 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 TOKEN = os.getenv("DISCORD_TOKEN")
-AUTHORIZED_GUILD_ID = 1535591159064301608
-GUILD_ID = str(AUTHORIZED_GUILD_ID)
-DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "radarok.db"))
+GUILD_ID = os.getenv("DISCORD_GUILD_ID") or None
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "community_bot.db"))
 RANK_ASSET_DIR = BASE_DIR / "assets" / "ranks"
 PRESERVED_SETUP_CHANNEL_IDS = {
-    1531432945888526376,
-    1531939680004739132,
+    int(channel_id.strip())
+    for channel_id in os.getenv("PRESERVED_SETUP_CHANNEL_IDS", "").split(",")
+    if channel_id.strip().isdigit()
 }
-BOT_UPDATE_CHANNEL_ID = 1531939680004739132
-BOT_UPDATE_VERSION = "2026.08.04-setup-fiabilise"
+BOT_UPDATE_VERSION = "2026.08.11-universel"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -115,7 +114,7 @@ class RoleSpec:
 # Les rôles sont déclarés du plus élevé au moins élevé.
 ROLE_SPECS = (
     RoleSpec(
-        "👑・Radarok",
+        "👑・Fondateur",
         0xF1C40F,
         discord.Permissions(administrator=True),
         True,
@@ -222,7 +221,7 @@ SERVER_STRUCTURE = (
     CategorySpec(
         "『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮",
         (
-            ChannelSpec("╰、🏆・𝐑adarok", "voice"),
+            ChannelSpec("╰、🏆・𝐅ondateur", "voice"),
             ChannelSpec("╰、🏆・𝐀lex", "voice"),
             ChannelSpec("━━━━━・✦・━━━━━", "voice"),
             ChannelSpec("╰、⚜️・𝐒taff 1", "voice"),
@@ -473,7 +472,7 @@ HELPER_LEADERBOARD_CHANNEL_NAME = stylize_channel_name("🏆・classement-helper
 HELPER_ROLE_NAME = "🆘・Helper"
 SUPERIOR_STAFF_ROLE_NAME = "🔱・Staff supérieur"
 SUPERIOR_SOURCE_ROLE_NAMES = (
-    "👑・Radarok",
+    "👑・Fondateur",
     "⚙️・Responsable",
     "🛡️・Administrateur",
 )
@@ -482,7 +481,7 @@ STAFF_VOICE_CATEGORY_NAME = decorate_category_name(
 )
 SERVER_STATS_CATEGORY_NAME = decorate_category_name("📊・SERVEUR STAT")
 STAFF_ROLE_NAMES = (
-    "👑・Radarok",
+    "👑・Fondateur",
     "⚙️・Responsable",
     "🛡️・Administrateur",
     "🔨・Modérateur",
@@ -540,20 +539,20 @@ URL_SHORTENERS = {
 }
 SOCIAL_BUMP_MESSAGES = {
     stylize_channel_name("🔴・youtube"): (
-        "🔴 **YouTube Radarok**\n"
+        "🔴 **YouTube officiel**\n"
         "Pense à consulter les dernières vidéos, à t'abonner et à activer la cloche !"
     ),
     stylize_channel_name("🟣・twitch"): (
-        "🟣 **Twitch Radarok**\n"
+        "🟣 **Twitch officiel**\n"
         "Suis la chaîne pour ne manquer aucun live et rejoindre l'équipage en direct !"
     ),
     stylize_channel_name("🎵・tiktok"): (
-        "🎵 **TikTok Radarok**\n"
-        "Découvre les nouveaux extraits et pense à suivre le compte pour soutenir Radarok !"
+        "🎵 **TikTok officiel**\n"
+        "Découvre les nouveaux extraits et pense à suivre le compte de la communauté !"
     ),
     stylize_channel_name("📱・réseaux"): (
-        "📱 **Réseaux de Radarok**\n"
-        "Retrouve ici toutes les actualités et les plateformes officielles de Radarok."
+        "📱 **Réseaux officiels**\n"
+        "Retrouve ici toutes les actualités et plateformes officielles du serveur."
     ),
 }
 SOCIAL_BUMP_HOURS = (9, 15, 21)
@@ -572,8 +571,8 @@ voice_join_times: dict[tuple[int, int], float] = {}
 setup_in_progress_guilds: set[int] = set()
 
 
-def authorized_guilds() -> list[discord.Guild]:
-    return [guild for guild in bot.guilds if guild.id == AUTHORIZED_GUILD_ID]
+def managed_guilds() -> list[discord.Guild]:
+    return list(bot.guilds)
 
 
 def initialize_database() -> None:
@@ -1358,7 +1357,7 @@ class VerificationView(discord.ui.View):
         label="Je valide le règlement",
         emoji="✅",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:verification:accept",
+        custom_id="community:verification:accept",
     )
     async def verify(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1416,7 +1415,7 @@ class RoleSelectionView(discord.ui.View):
             SelfRoleSelect(
                 role_names=NOTIFICATION_ROLES,
                 placeholder="Choisis tes notifications",
-                custom_id="radarok:roles:notifications",
+                custom_id="community:roles:notifications",
                 max_values=len(NOTIFICATION_ROLES),
             )
         )
@@ -1424,7 +1423,7 @@ class RoleSelectionView(discord.ui.View):
             SelfRoleSelect(
                 role_names=ACTIVITY_ROLES,
                 placeholder="Choisis tes activités Blox Fruits",
-                custom_id="radarok:roles:activities",
+                custom_id="community:roles:activities",
                 max_values=len(ACTIVITY_ROLES),
             )
         )
@@ -1432,7 +1431,7 @@ class RoleSelectionView(discord.ui.View):
             SelfRoleSelect(
                 role_names=RACE_ROLES,
                 placeholder="Choisis ta race Blox Fruits",
-                custom_id="radarok:roles:race",
+                custom_id="community:roles:race",
                 max_values=1,
             )
         )
@@ -1620,7 +1619,7 @@ class TicketPanelView(discord.ui.View):
         label="Assistance",
         emoji="🆘",
         style=discord.ButtonStyle.primary,
-        custom_id="radarok:ticket:assistance",
+        custom_id="community:ticket:assistance",
     )
     async def assistance(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1633,7 +1632,7 @@ class TicketPanelView(discord.ui.View):
         label="Partenariat",
         emoji="🤝",
         style=discord.ButtonStyle.secondary,
-        custom_id="radarok:ticket:partenariat",
+        custom_id="community:ticket:partenariat",
     )
     async def partnership(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1646,7 +1645,7 @@ class TicketPanelView(discord.ui.View):
         label="Signalement",
         emoji="🛡️",
         style=discord.ButtonStyle.danger,
-        custom_id="radarok:ticket:signalement",
+        custom_id="community:ticket:signalement",
     )
     async def report(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1707,7 +1706,7 @@ class RecruitmentPanelView(discord.ui.View):
         label="Déposer ma candidature",
         emoji="📝",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:recruitment:apply",
+        custom_id="community:recruitment:apply",
     )
     async def apply(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1861,7 +1860,7 @@ class TicketControlView(discord.ui.View):
         label="Prendre en charge",
         emoji="🙋",
         style=discord.ButtonStyle.primary,
-        custom_id="radarok:ticket:claim",
+        custom_id="community:ticket:claim",
     )
     async def claim(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1993,7 +1992,7 @@ class TicketControlView(discord.ui.View):
         label="Faire remonter",
         emoji="⬆️",
         style=discord.ButtonStyle.secondary,
-        custom_id="radarok:ticket:escalate",
+        custom_id="community:ticket:escalate",
     )
     async def escalate(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -2106,7 +2105,7 @@ class TicketControlView(discord.ui.View):
         label="Fermer",
         emoji="🔒",
         style=discord.ButtonStyle.danger,
-        custom_id="radarok:ticket:close",
+        custom_id="community:ticket:close",
     )
     async def close(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -2245,7 +2244,7 @@ class GiveawayView(discord.ui.View):
         label="Participer",
         emoji="🎉",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:giveaway:join",
+        custom_id="community:giveaway:join",
     )
     async def participate(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -2298,7 +2297,7 @@ class GiveawayView(discord.ui.View):
         label="Participants",
         emoji="👥",
         style=discord.ButtonStyle.secondary,
-        custom_id="radarok:giveaway:participants",
+        custom_id="community:giveaway:participants",
     )
     async def participants(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -2325,7 +2324,7 @@ class GiveawayView(discord.ui.View):
         label="Durée",
         emoji="⏳",
         style=discord.ButtonStyle.primary,
-        custom_id="radarok:giveaway:duration",
+        custom_id="community:giveaway:duration",
     )
     async def duration(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -2348,7 +2347,7 @@ class GiveawayView(discord.ui.View):
         label="Mes chances",
         emoji="🍀",
         style=discord.ButtonStyle.primary,
-        custom_id="radarok:giveaway:chance",
+        custom_id="community:giveaway:chance",
     )
     async def chances(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -2385,12 +2384,12 @@ async def ensure_roles(
             created_count += 1
         roles[spec.name] = role
 
-    radarok_role = roles["👑・Radarok"]
+    founder_role = roles["👑・Fondateur"]
     owner = guild.owner
     if owner is None:
         owner = await guild.fetch_member(guild.owner_id)
-    if radarok_role not in owner.roles:
-        await owner.add_roles(radarok_role, reason=reason)
+    if founder_role not in owner.roles:
+        await owner.add_roles(founder_role, reason=reason)
 
     return roles, created_count
 
@@ -2683,7 +2682,7 @@ def staff_overwrites(
         ),
     }
     for role_name in (
-        "👑・Radarok",
+        "👑・Fondateur",
         "⚙️・Responsable",
         "🛡️・Administrateur",
         "🔨・Modérateur",
@@ -3528,7 +3527,7 @@ async def update_crew_presentation(guild: discord.Guild, crew_id: int) -> None:
                 else ""
             )
             + f"**Membres :** {member_count}/{row[5]}\n"
-            f"**Créé sur Radarok Community**"
+            f"**Créé sur {guild.name}**"
         ),
         colour=discord.Colour.gold(),
     )
@@ -4094,7 +4093,7 @@ class CrewApplicationView(discord.ui.View):
         label="Accepter",
         emoji="✅",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:crew:application:accept",
+        custom_id="community:crew:application:accept",
     )
     async def accept(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -4105,7 +4104,7 @@ class CrewApplicationView(discord.ui.View):
         label="Refuser",
         emoji="❌",
         style=discord.ButtonStyle.danger,
-        custom_id="radarok:crew:application:reject",
+        custom_id="community:crew:application:reject",
     )
     async def reject(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -4121,7 +4120,7 @@ class CrewRecruitmentView(discord.ui.View):
         label="Postuler",
         emoji="📨",
         style=discord.ButtonStyle.primary,
-        custom_id="radarok:crew:apply",
+        custom_id="community:crew:apply",
     )
     async def apply(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -4913,7 +4912,7 @@ class TradeOfferView(discord.ui.View):
         label="Je suis intéressé",
         emoji="🤝",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:trade:interested",
+        custom_id="community:trade:interested",
     )
     async def interested(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -5216,7 +5215,7 @@ class SanctionUndoView(discord.ui.View):
         label="Annuler la sanction",
         emoji="↩️",
         style=discord.ButtonStyle.secondary,
-        custom_id="radarok:moderation:undo",
+        custom_id="community:moderation:undo",
     )
     async def undo(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -6238,7 +6237,7 @@ async def staff_statistics(
 @app_commands.checks.has_permissions(administrator=True)
 async def admin_commands_command(interaction: discord.Interaction) -> None:
     embed = discord.Embed(
-        title="🛠️ Commandes d'administration de RadarokBot",
+        title="🛠️ Commandes d'administration du bot",
         description=(
             "Toutes les commandes sensibles utilisent des tirets et sont protégées "
             "par les permissions Discord et les vérifications du bot."
@@ -6461,7 +6460,7 @@ class SuggestionVoteView(discord.ui.View):
         label="Pour",
         emoji="👍",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:suggestion:up",
+        custom_id="community:suggestion:up",
     )
     async def vote_up(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -6472,7 +6471,7 @@ class SuggestionVoteView(discord.ui.View):
         label="Contre",
         emoji="👎",
         style=discord.ButtonStyle.danger,
-        custom_id="radarok:suggestion:down",
+        custom_id="community:suggestion:down",
     )
     async def vote_down(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -6631,7 +6630,7 @@ class CommunityEventView(discord.ui.View):
         label="S'inscrire",
         emoji="✅",
         style=discord.ButtonStyle.success,
-        custom_id="radarok:event:join",
+        custom_id="community:event:join",
     )
     async def join(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -6704,7 +6703,7 @@ class CommunityEventView(discord.ui.View):
         label="Participants",
         emoji="👥",
         style=discord.ButtonStyle.secondary,
-        custom_id="radarok:event:participants",
+        custom_id="community:event:participants",
     )
     async def participants(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -7708,7 +7707,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
 
         if rules_channel is not None:
             rules_embed = discord.Embed(
-                title="📜 Règlement de la communauté Radarok",
+                title=f"📜 Règlement de {guild.name}",
                 description=(
                     "Bienvenue dans l'équipage ! En rejoignant et en utilisant ce "
                     "serveur, tu acceptes les règles ci-dessous. Elles permettent de "
@@ -7814,7 +7813,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 inline=False,
             )
             rules_embed.set_footer(
-                text="Radarok Community • Le règlement peut évoluer si nécessaire"
+                text=f"{guild.name} • Le règlement peut évoluer si nécessaire"
             )
             await rules_channel.send(embed=rules_embed)
 
@@ -7822,7 +7821,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             verification_embed = discord.Embed(
                 title="✅ Vérification de la communauté",
                 description=(
-                    "Bienvenue dans la communauté de **Radarok** !\n\n"
+                    f"Bienvenue dans la communauté de **{guild.name}** !\n\n"
                     "Avant d'accéder au serveur, lis attentivement le règlement puis "
                     "clique sur le bouton ci-dessous pour confirmer que tu l'acceptes.\n\n"
                     "En validant, tu recevras automatiquement le rôle `✅・Membre`."
@@ -7847,7 +7846,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 ),
                 colour=discord.Colour.orange(),
             )
-            embed.set_footer(text="Communauté de Radarok")
+            embed.set_footer(text=guild.name)
             await role_selection_channel.send(
                 embed=embed, view=RoleSelectionView()
             )
@@ -7857,7 +7856,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 title="❓ Questions fréquentes",
                 description=(
                     "Retrouve ici les réponses rapides aux questions les plus courantes "
-                    "sur la communauté de Radarok."
+                    f"sur la communauté de {guild.name}."
                 ),
                 colour=discord.Colour.blurple(),
             )
@@ -7932,7 +7931,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 ),
                 inline=False,
             )
-            changelog_embed.set_footer(text="Radarok Community")
+            changelog_embed.set_footer(text=guild.name)
             await changelog_channel.send(embed=changelog_embed)
 
         if trade_channel is not None:
@@ -7978,7 +7977,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 inline=False,
             )
             trade_embed.set_footer(
-                text="Radarok n'est pas affilié à Blox Fruits Values"
+                text=f"{guild.name} n'est pas affilié à Blox Fruits Values"
             )
             await trade_channel.send(embed=trade_embed)
 
@@ -8068,7 +8067,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             clips_embed.add_field(
                 name="✅ Autorisé",
                 value=(
-                    "Tes propres clips, les clips de Radarok et les créations pour "
+                    "Tes propres clips, les clips officiels et les créations pour "
                     "lesquelles tu as l'autorisation. Ajoute une courte description."
                 ),
                 inline=False,
@@ -8090,7 +8089,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             ticket_rules_embed = discord.Embed(
                 title="📜 Règlement et utilisation des tickets",
                 description=(
-                    "Les tickets servent à contacter l'équipe de Radarok de manière "
+                    "Les tickets servent à contacter l'équipe du serveur de manière "
                     "privée. Lis ces consignes avant d'en ouvrir un."
                 ),
                 colour=discord.Colour.orange(),
@@ -8136,7 +8135,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
 
         if ticket_panel_channel is not None:
             ticket_embed = discord.Embed(
-                title="🎫 Centre d'assistance de Radarok",
+                title=f"🎫 Centre d'assistance de {guild.name}",
                 description=(
                     "Choisis le type de demande correspondant à ta situation.\n"
                     "Un salon privé sera créé entre toi et l'équipe.\n\n"
@@ -8156,7 +8155,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
 
         if recruitment_info_channel is not None:
             recruitment_info_embed = discord.Embed(
-                title="📋 Rejoindre l'équipe de Radarok",
+                title=f"📋 Rejoindre l'équipe de {guild.name}",
                 description=(
                     "Tu souhaites aider la communauté et participer à son évolution ? "
                     "Lis les conditions ci-dessous avant de déposer ta candidature."
@@ -8498,7 +8497,7 @@ async def send_discord_audit_entry(
 @tasks.loop(seconds=10)
 async def discord_audit_log_loop() -> None:
     connection = require_database()
-    for guild in authorized_guilds():
+    for guild in managed_guilds():
         if guild.id in setup_in_progress_guilds:
             continue
         channel = await ensure_discord_audit_log_channel(guild)
@@ -8588,7 +8587,7 @@ async def _setup_error(
 
 @bot.tree.command(
     name="setup",
-    description="Reconstruit entièrement le serveur Radarok.",
+    description="Reconstruit entièrement la structure du serveur.",
 )
 @app_commands.guild_only()
 @app_commands.default_permissions(administrator=True)
@@ -8615,19 +8614,17 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         (guild.id, BOT_UPDATE_VERSION),
     ).fetchone():
         return
-    channel = guild.get_channel(BOT_UPDATE_CHANNEL_ID)
-    if not isinstance(channel, discord.TextChannel):
+    channel = discord.utils.get(guild.text_channels, name=CHANGELOG_CHANNEL_NAME)
+    if channel is None:
         logging.warning(
-            "Salon de mises à jour %s introuvable sur %s",
-            BOT_UPDATE_CHANNEL_ID,
-            guild.id,
+            "Salon de mises à jour introuvable sur le serveur %s", guild.id
         )
         return
     embed = discord.Embed(
-        title="📰 RadarokBot — Fonctionnalités complètes",
+        title="📰 Bot communautaire — Fonctionnalités complètes",
         description=(
             "Voici l'ensemble des systèmes actuellement disponibles sur le serveur, "
-            "ainsi que les dernières nouveautés ajoutées à RadarokBot."
+            "ainsi que les dernières nouveautés ajoutées au bot."
         ),
         colour=discord.Colour.orange(),
         timestamp=datetime.now(timezone.utc),
@@ -8771,7 +8768,7 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         ),
         inline=False,
     )
-    embed.set_footer(text=f"RadarokBot • Version {BOT_UPDATE_VERSION}")
+    embed.set_footer(text=f"{guild.name} • Version {BOT_UPDATE_VERSION}")
     try:
         message = await channel.send(embed=embed)
     except discord.HTTPException:
@@ -8813,7 +8810,7 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
     )
     if commands_channel is not None:
         embed = discord.Embed(
-            title="🤖 Commandes de RadarokBot",
+            title="🤖 Commandes du bot",
             description=(
                 "Toutes les commandes utilisent des **tirets**. Les commandes "
                 "affichées par Discord avec un ancien nom ne doivent plus être utilisées."
@@ -8879,7 +8876,7 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
         )
         await upsert_command_guide(
             commands_channel,
-            title="🤖 Commandes de RadarokBot",
+            title="🤖 Commandes du bot",
             embed=embed,
         )
 
@@ -9004,15 +9001,13 @@ async def setup_hook() -> None:
         bot.tree.copy_global_to(guild=guild_object)
         bot.tree.clear_commands(guild=None)
         await bot.tree.sync()
+    else:
+        await bot.tree.sync()
 
 
 @bot.event
 async def on_message(message: discord.Message) -> None:
-    if (
-        message.guild is None
-        or message.guild.id != AUTHORIZED_GUILD_ID
-        or message.author.bot
-    ):
+    if message.guild is None or message.author.bot:
         return
     if await moderate_message(message):
         return
@@ -9027,7 +9022,7 @@ async def voice_xp_loop() -> None:
     entries: list[tuple[int, int]] = []
     rewarded_members: list[discord.Member] = []
 
-    for guild in authorized_guilds():
+    for guild in managed_guilds():
         for channel in guild.voice_channels:
             if channel == guild.afk_channel or channel.name == TEMP_VOICE_TRIGGER_NAME:
                 continue
@@ -9128,7 +9123,7 @@ async def before_giveaway_end_loop() -> None:
 async def event_reminder_loop() -> None:
     now = datetime.now(timezone.utc)
     connection = require_database()
-    for guild in authorized_guilds():
+    for guild in managed_guilds():
         channel = discord.utils.get(
             guild.text_channels, name=EVENT_ANNOUNCEMENT_CHANNEL_NAME
         )
@@ -9240,7 +9235,7 @@ async def clip_rules_reminder_loop() -> None:
         return
     slot = f"clips-{now.date().isoformat()}"
     connection = require_database()
-    for guild in authorized_guilds():
+    for guild in managed_guilds():
         channel = discord.utils.get(guild.text_channels, name=CLIPS_CHANNEL_NAME)
         if channel is None:
             continue
@@ -9295,7 +9290,7 @@ async def social_bump_loop() -> None:
         return
     slot = f"{now.date().isoformat()}-{now.hour:02d}"
     connection = require_database()
-    for guild in authorized_guilds():
+    for guild in managed_guilds():
         for channel_name, content in SOCIAL_BUMP_MESSAGES.items():
             channel = discord.utils.get(guild.text_channels, name=channel_name)
             if channel is None:
@@ -9415,8 +9410,6 @@ async def on_message_edit(before: discord.Message, after: discord.Message) -> No
 
 @bot.event
 async def on_member_join(member: discord.Member) -> None:
-    if member.guild.id != AUTHORIZED_GUILD_ID:
-        return
     await update_server_stats(member.guild)
     log_channel = discord.utils.get(
         member.guild.text_channels, name=JOIN_LEAVE_LOG_CHANNEL_NAME
@@ -9465,10 +9458,10 @@ async def on_member_join(member: discord.Member) -> None:
         return
 
     embed = discord.Embed(
-        title="🏴‍☠️ Bienvenue dans l'équipage de Radarok !",
+        title=f"🏴‍☠️ Bienvenue sur {member.guild.name} !",
         description=(
             f"Bienvenue à bord, {member.mention} ! 🌊\n\n"
-            "Tu viens de rejoindre la communauté de **Radarok**, consacrée à "
+            f"Tu viens de rejoindre la communauté de **{member.guild.name}**, consacrée à "
             "**Blox Fruits**, aux vidéos, aux lives et aux aventures entre joueurs.\n\n"
             "**Pour accéder au serveur :**\n"
             f"1️⃣ Lis attentivement le règlement dans `{RULES_CHANNEL_NAME}`\n"
@@ -9482,7 +9475,7 @@ async def on_member_join(member: discord.Member) -> None:
         colour=discord.Colour.orange(),
     )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text="Radarok Community • Bon voyage parmi nous !")
+    embed.set_footer(text=f"{member.guild.name} • Bon voyage parmi nous !")
     try:
         await welcome_channel.send(embed=embed)
     except discord.Forbidden:
@@ -9491,8 +9484,6 @@ async def on_member_join(member: discord.Member) -> None:
 
 @bot.event
 async def on_member_remove(member: discord.Member) -> None:
-    if member.guild.id != AUTHORIZED_GUILD_ID:
-        return
     await update_server_stats(member.guild)
     if is_helper(member):
         require_database().execute(
@@ -9529,8 +9520,6 @@ async def on_member_remove(member: discord.Member) -> None:
 async def on_member_update(
     before: discord.Member, after: discord.Member
 ) -> None:
-    if after.guild.id != AUTHORIZED_GUILD_ID:
-        return
     if before.roles != after.roles:
         superior_role = discord.utils.get(
             after.guild.roles, name=SUPERIOR_STAFF_ROLE_NAME
@@ -9563,7 +9552,7 @@ async def on_member_update(
                 title="💎 Merci pour le boost !",
                 description=(
                     f"Un immense merci à {after.mention} qui vient de booster le "
-                    "serveur ! Ton soutien aide directement la communauté de Radarok "
+                    f"serveur ! Ton soutien aide directement la communauté de {after.guild.name} "
                     "à profiter de meilleurs avantages Discord. 🧡"
                 ),
                 colour=discord.Colour.magenta(),
@@ -9591,21 +9580,19 @@ async def on_member_update(
 
 @bot.event
 async def on_guild_update(before: discord.Guild, after: discord.Guild) -> None:
-    if after.id != AUTHORIZED_GUILD_ID:
-        return
     if before.premium_subscription_count != after.premium_subscription_count:
         await update_server_stats(after)
 
 
 @bot.event
 async def on_invite_create(invite: discord.Invite) -> None:
-    if invite.guild is not None and invite.guild.id == AUTHORIZED_GUILD_ID:
+    if invite.guild is not None:
         await refresh_invite_cache(invite.guild)
 
 
 @bot.event
 async def on_invite_delete(invite: discord.Invite) -> None:
-    if invite.guild is not None and invite.guild.id == AUTHORIZED_GUILD_ID:
+    if invite.guild is not None:
         await refresh_invite_cache(invite.guild)
 
 
@@ -9615,7 +9602,7 @@ async def on_voice_state_update(
     before: discord.VoiceState,
     after: discord.VoiceState,
 ) -> None:
-    if member.guild.id != AUTHORIZED_GUILD_ID or member.bot:
+    if member.bot:
         return
 
     if before.channel != after.channel:
@@ -9784,21 +9771,7 @@ async def on_ready() -> None:
     if bot.user is None:
         return
 
-    for guild in tuple(bot.guilds):
-        if guild.id != AUTHORIZED_GUILD_ID:
-            logging.warning(
-                "Départ automatique du serveur non autorisé %s (%s)",
-                guild.name,
-                guild.id,
-            )
-            try:
-                await guild.leave()
-            except discord.HTTPException:
-                logging.exception(
-                    "Impossible de quitter le serveur non autorisé %s", guild.id
-                )
-
-    for guild in authorized_guilds():
+    for guild in managed_guilds():
         await ensure_superior_staff_area(guild)
         helper_role = await ensure_helper_role(guild)
         if helper_role is not None:
@@ -9837,12 +9810,8 @@ async def on_ready() -> None:
         synced = await bot.tree.sync(guild=guild_object)
         scope = f"le serveur {GUILD_ID}"
     else:
-        synced = []
-        for guild in bot.guilds:
-            guild_object = discord.Object(id=guild.id)
-            bot.tree.copy_global_to(guild=guild_object)
-            synced.extend(await bot.tree.sync(guild=guild_object))
-        scope = f"{len(bot.guilds)} serveur(s)"
+        synced = await bot.tree.sync()
+        scope = "la synchronisation globale"
 
     logging.info(
         "Connecté en tant que %s (%s) — %s commande(s) synchronisée(s) sur %s",
@@ -9855,28 +9824,15 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_guild_join(guild: discord.Guild) -> None:
-    if guild.id != AUTHORIZED_GUILD_ID:
-        logging.warning(
-            "Invitation refusée sur le serveur non autorisé %s (%s)",
-            guild.name,
+    await refresh_invite_cache(guild)
+    if GUILD_ID and guild.id == int(GUILD_ID):
+        guild_object = discord.Object(id=guild.id)
+        synced = await bot.tree.sync(guild=guild_object)
+        logging.info(
+            "%s commande(s) synchronisée(s) sur le serveur de développement %s",
+            len(synced),
             guild.id,
         )
-        try:
-            await guild.leave()
-        except discord.HTTPException:
-            logging.exception(
-                "Impossible de quitter le serveur non autorisé %s", guild.id
-            )
-        return
-    await refresh_invite_cache(guild)
-    guild_object = discord.Object(id=guild.id)
-    bot.tree.copy_global_to(guild=guild_object)
-    synced = await bot.tree.sync(guild=guild_object)
-    logging.info(
-        "%s commande(s) synchronisée(s) sur le nouveau serveur %s",
-        len(synced),
-        guild.id,
-    )
 
 
 if __name__ == "__main__":

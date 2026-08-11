@@ -3,8 +3,8 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
-radarok.db
-radarok.db-shm
-radarok.db-wal
+community_bot.db
+community_bot.db-shm
+community_bot.db-wal
 transcripts/
 assets/ranks/source/

@@ -1,11 +1,8 @@
-# RadarokBot
+# Bot Discord communautaire
 
-Bot Discord communautaire de Radarok's World. La commande administrateur
-`/setup` reconstruit automatiquement la structure complète du serveur.
-
-Le bot est verrouillé sur le serveur Discord `1535591159064301608`. Il ne
-synchronise ses commandes et n'exécute ses automatisations que sur ce serveur ;
-il quitte automatiquement tout autre serveur auquel il serait invité.
+Bot Discord communautaire universel. La commande administrateur `/setup`
+reconstruit automatiquement la structure complète de chaque serveur où il est
+utilisé, sans nom, identifiant ou marque imposés.
 
 ## Installation
 
@@ -25,9 +22,11 @@ il quitte automatiquement tout autre serveur auquel il serait invité.
    ```
 
    - `DISCORD_TOKEN` : token disponible dans le portail développeur Discord.
-   - `DISCORD_GUILD_ID` : utilise `1535591159064301608`. L'identifiant autorisé
-     est également verrouillé dans le code afin d'empêcher l'utilisation du bot
-     sur un autre serveur.
+   - `DISCORD_GUILD_ID` : facultatif. Indique un serveur pendant le développement
+     pour synchroniser les commandes presque immédiatement. Laisse vide pour un
+     fonctionnement universel sur tous les serveurs où le bot est invité.
+   - `PRESERVED_SETUP_CHANNEL_IDS` : facultatif. Liste d'identifiants séparés par
+     des virgules pour protéger certains salons lors de `/setup`.
 
 4. Dans le portail développeur, active **Server Members Intent** et
    **Message Content Intent** dans l'onglet `Bot`, puis invite le bot avec les
@@ -47,8 +46,8 @@ il quitte automatiquement tout autre serveur auquel il serait invité.
 - `/setup` est strictement réservé aux administrateurs. Il supprime les salons
   et catégories non protégés, ferme les données dynamiques devenues invalides,
   puis recrée les rôles, permissions, salons, panneaux et messages automatiques.
-- Les salons Discord `1531432945888526376` et `1531939680004739132` sont
-  explicitement protégés et ne sont jamais supprimés par `/setup`.
+- Les salons renseignés dans `PRESERVED_SETUP_CHANNEL_IDS` ne sont jamais
+  supprimés par `/setup`.
 - Les permissions d'écriture sont appliquées salon par salon. Le règlement,
   l'accueil, les annonces, réseaux, panneaux, sondages, niveaux, giveaways,
   valeurs, stocks et mises à jour sont en lecture seule pour les membres.
@@ -57,7 +56,7 @@ il quitte automatiquement tout autre serveur auquel il serait invité.
 - Toutes les catégories utilisent le décor `○─────Nom─────➤`, sauf les Vocaux
   Staff qui reprennent le décor spécial `『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮`.
 - Les catégories Vocaux Staff et Serveur Stat sont créées en premier. Les
-  membres voient les bureaux Radarok, Alex, Staff 1 à 5 et Test Vocal, mais ne
+  membres voient les bureaux Fondateur, Alex, Staff 1 à 5 et Test Vocal, mais ne
   peuvent rejoindre que la salle d'attente ; le staff accède à tous les bureaux.
 - Les compteurs Membres, Humains, Bots et Boosts sont affichés dans des salons
   vocaux verrouillés et actualisés automatiquement.
@@ -65,7 +64,7 @@ il quitte automatiquement tout autre serveur auquel il serait invité.
   `🤝・Partenaire` peut écrire dans le chat partenaire.
 - Elle crée les rôles d'équipe, communautaires, de notifications, d'activités,
   de races Blox Fruits et de progression qui n'existent pas encore.
-- Elle attribue le rôle `👑・Radarok` au propriétaire du serveur.
+- Elle attribue le rôle `👑・Fondateur` au propriétaire du serveur.
 - Elle publie trois menus de rôles persistants dans `🎭・choix-des-rôles`.
 - La catégorie `🔒・ÉQUIPE` est visible uniquement par les rôles du staff.
 - Elle applique les limites visibles aux salons vocaux.
@@ -121,7 +120,7 @@ il quitte automatiquement tout autre serveur auquel il serait invité.
 - Le helper peut clôturer le ticket ou le faire remonter au staff supérieur.
 - Le rôle `🔱・Staff supérieur` et la catégorie privée
   `⬆️・TICKETS REMONTÉS` sont créés automatiquement au démarrage.
-- Les membres possédant les rôles Radarok, Responsable ou Administrateur
+- Les membres possédant les rôles Fondateur, Responsable ou Administrateur
   reçoivent automatiquement le rôle Staff supérieur.
 - Lors d'une remontée, le ticket est déplacé dans cette catégorie et ses
   permissions sont reconstruites : seuls son auteur, le Staff supérieur et le
