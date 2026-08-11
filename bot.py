@@ -221,8 +221,8 @@ SERVER_STRUCTURE = (
     CategorySpec(
         "『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮",
         (
-            ChannelSpec("╰、🏆・𝐅ondateur", "voice"),
-            ChannelSpec("╰、🏆・𝐀lex", "voice"),
+            ChannelSpec("╰、🏆・𝟏v7", "voice"),
+            ChannelSpec("╰、🏆・𝐏erry", "voice"),
             ChannelSpec("━━━━━・✦・━━━━━", "voice"),
             ChannelSpec("╰、⚜️・𝐒taff 1", "voice"),
             ChannelSpec("╰、⚜️・𝐒taff 2", "voice"),

@@ -56,7 +56,7 @@ utilisé, sans nom, identifiant ou marque imposés.
 - Toutes les catégories utilisent le décor `○─────Nom─────➤`, sauf les Vocaux
   Staff qui reprennent le décor spécial `『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮`.
 - Les catégories Vocaux Staff et Serveur Stat sont créées en premier. Les
-  membres voient les bureaux Fondateur, Alex, Staff 1 à 5 et Test Vocal, mais ne
+  membres voient les bureaux 1v7, Perry, Staff 1 à 5 et Test Vocal, mais ne
   peuvent rejoindre que la salle d'attente ; le staff accède à tous les bureaux.
 - Les compteurs Membres, Humains, Bots et Boosts sont affichés dans des salons
   vocaux verrouillés et actualisés automatiquement.
