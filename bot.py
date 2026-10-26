@@ -390,8 +390,6 @@ NOTIFICATION_ROLES = (
 )
 ACTIVITY_ROLES = (
     "🎮・Joueur",
-    "💡・Créateur",
-    "🐛・Bug Hunter",
 )
 PLATFORM_ROLES = (
     "📱・Mobile",
@@ -7767,7 +7765,9 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 description=(
                     "Utilise les menus ci-dessous pour personnaliser tes notifications, "
                     "choisir ton profil communautaire et indiquer les plateformes sur "
-                    "lesquelles tu joues à Roblox."
+                    "lesquelles tu joues à Roblox.\n\n"
+                    "Les rôles `💡・Créateur` et `🐛・Bug Hunter` sont des distinctions "
+                    "attribuées uniquement par le staff."
                 ),
                 colour=discord.Colour.orange(),
             )
