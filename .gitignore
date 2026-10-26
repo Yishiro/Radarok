@@ -6,5 +6,6 @@ venv/
 community_bot.db
 community_bot.db-shm
 community_bot.db-wal
+.setup-complete-*
 transcripts/
 assets/ranks/source/

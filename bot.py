@@ -22,11 +22,14 @@ from PIL import Image, ImageDraw, ImageFont
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD_ID = os.getenv('DISCORD_GUILD_ID') or None
+TARGET_GUILD_ID = 1564053052015771728
+GUILD_ID = os.getenv('DISCORD_GUILD_ID') or str(TARGET_GUILD_ID)
 DATABASE_PATH = Path(os.getenv('DATABASE_PATH', BASE_DIR / 'community_bot.db'))
 RANK_ASSET_DIR = BASE_DIR / 'assets' / 'ranks'
 PRESERVED_SETUP_CHANNEL_IDS = {int(channel_id.strip()) for channel_id in os.getenv('PRESERVED_SETUP_CHANNEL_IDS', '').split(',') if channel_id.strip().isdigit()}
 BOT_UPDATE_VERSION = '2026.10.26-studio-roblox'
+AUTO_SETUP_VERSION = '2026.10.26-english-community-v1'
+AUTO_SETUP_MARKER = BASE_DIR / f'.setup-complete-{TARGET_GUILD_ID}-{AUTO_SETUP_VERSION}'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
@@ -165,7 +168,7 @@ voice_join_times: dict[tuple[int, int], float] = {}
 setup_in_progress_guilds: set[int] = set()
 
 def managed_guilds() -> list[discord.Guild]:
-    return list(bot.guilds)
+    return [guild for guild in bot.guilds if guild.id == TARGET_GUILD_ID]
 
 def initialize_database() -> None:
     global database
@@ -2805,18 +2808,28 @@ async def reset_level_command(interaction: discord.Interaction, membre: discord.
     await update_level_role(membre)
     await interaction.response.send_message(f'{membre.mention} has been reset: level **{previous_level} → 0** and **{previous_xp:,} XP** removed.', ephemeral=True)
 
-async def _setup_server_structure(interaction: discord.Interaction) -> None:
+async def _setup_server_structure(interaction: discord.Interaction | None=None, *, target_guild: discord.Guild | None=None) -> bool:
     """Fully restores the community structure of the server."""
-    guild = interaction.guild
+    guild = target_guild or (interaction.guild if interaction is not None else None)
     if guild is None:
-        await interaction.response.send_message('This command must be used in a server.', ephemeral=True)
-        return
+        if interaction is not None:
+            await interaction.response.send_message('This command must be used in a server.', ephemeral=True)
+        return False
+    if guild.id != TARGET_GUILD_ID:
+        if interaction is not None:
+            await interaction.response.send_message('This bot is configured for another server.', ephemeral=True)
+        return False
     if guild.id in setup_in_progress_guilds:
-        await interaction.response.send_message('A `/setup` is already running on this server.', ephemeral=True)
-        return
-    await interaction.response.defer(ephemeral=True, thinking=True)
+        if interaction is not None:
+            await interaction.response.send_message('A `/setup` is already running on this server.', ephemeral=True)
+        return False
+    if interaction is not None:
+        await interaction.response.defer(ephemeral=True, thinking=True)
     setup_in_progress_guilds.add(guild.id)
-    reason = f'Command /setup launched by {interaction.user} ({interaction.user.id})'
+    if interaction is not None:
+        reason = f'Command /setup launched by {interaction.user} ({interaction.user.id})'
+    else:
+        reason = f'Automatic one-time setup for server {guild.id}'
     created_categories = 0
     created_channels = 0
     created_roles = 0
@@ -3008,15 +3021,23 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
         await ensure_discord_audit_log_channel(guild)
         await refresh_command_guides(guild)
         fallback_message = f'\n⚠️ **{stage_fallbacks}** conference channel(s) have been created in voice channels, as Discord does not allow conferences on this server.' if stage_fallbacks else ''
-        try:
-            await interaction.followup.send(f'Reset completed: **{deleted_categories}** category(s) and **{deleted_channels}** removed, then **{created_categories}** category(s), **{created_channels}** channel(s) and **{created_roles}** new role(s) created.{fallback_message}', ephemeral=True)
-        except discord.NotFound:
-            logging.info('Reset completed: %s channels and %s categories deleted', deleted_channels, deleted_categories)
+        if interaction is not None:
+            try:
+                await interaction.followup.send(f'Reset completed: **{deleted_categories}** category(s) and **{deleted_channels}** removed, then **{created_categories}** category(s), **{created_channels}** channel(s) and **{created_roles}** new role(s) created.{fallback_message}', ephemeral=True)
+            except discord.NotFound:
+                pass
+        logging.info('Reset completed on server %s: %s channels and %s categories deleted', guild.id, deleted_channels, deleted_categories)
+        return True
     except discord.Forbidden:
-        await interaction.followup.send("I don't have the necessary permission. Place my role above the roles involved and grant me ** Manage ** Trade Shows.", ephemeral=True)
+        logging.exception('Missing permissions during /setup on server %s', guild.id)
+        if interaction is not None:
+            await interaction.followup.send("I don't have the necessary permissions. Place my role above the managed roles and grant it Administrator permissions.", ephemeral=True)
+        return False
     except discord.HTTPException as error:
         logging.exception('Discord refused an operation during /setup')
-        await interaction.followup.send(f'Discord refused an operation (`{error.code}`) : `{error.text}`', ephemeral=True)
+        if interaction is not None:
+            await interaction.followup.send(f'Discord refused an operation (`{error.code}`): `{error.text}`', ephemeral=True)
+        return False
     finally:
         setup_in_progress_guilds.discard(guild.id)
 
@@ -3274,7 +3295,7 @@ async def setup_hook() -> None:
 
 @bot.event
 async def on_message(message: discord.Message) -> None:
-    if message.guild is None or message.author.bot:
+    if message.guild is None or message.guild.id != TARGET_GUILD_ID or message.author.bot:
         return
     if await moderate_message(message):
         return
@@ -3470,7 +3491,7 @@ async def before_social_bump_loop() -> None:
 
 @bot.event
 async def on_message_delete(message: discord.Message) -> None:
-    if message.guild is None or message.author.bot:
+    if message.guild is None or message.guild.id != TARGET_GUILD_ID or message.author.bot:
         return
     channel = discord.utils.get(message.guild.text_channels, name=DELETED_MESSAGE_LOG_CHANNEL_NAME)
     if channel is None:
@@ -3488,7 +3509,7 @@ async def on_message_delete(message: discord.Message) -> None:
 
 @bot.event
 async def on_message_edit(before: discord.Message, after: discord.Message) -> None:
-    if before.guild is None or before.author.bot or before.content == after.content:
+    if before.guild is None or before.guild.id != TARGET_GUILD_ID or before.author.bot or before.content == after.content:
         return
     channel = discord.utils.get(before.guild.text_channels, name=EDITED_MESSAGE_LOG_CHANNEL_NAME)
     if channel is None:
@@ -3504,6 +3525,8 @@ async def on_message_edit(before: discord.Message, after: discord.Message) -> No
 
 @bot.event
 async def on_member_join(member: discord.Member) -> None:
+    if member.guild.id != TARGET_GUILD_ID:
+        return
     await update_server_stats(member.guild)
     log_channel = discord.utils.get(member.guild.text_channels, name=JOIN_LEAVE_LOG_CHANNEL_NAME)
     if log_channel is not None:
@@ -3540,6 +3563,8 @@ async def on_member_join(member: discord.Member) -> None:
 
 @bot.event
 async def on_member_remove(member: discord.Member) -> None:
+    if member.guild.id != TARGET_GUILD_ID:
+        return
     await update_server_stats(member.guild)
     if is_helper(member):
         require_database().execute("\n            UPDATE tickets SET claimed_by = NULL\n            WHERE guild_id = ? AND claimed_by = ? AND status = 'open'\n            ", (member.guild.id, member.id))
@@ -3556,6 +3581,8 @@ async def on_member_remove(member: discord.Member) -> None:
 
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member) -> None:
+    if after.guild.id != TARGET_GUILD_ID:
+        return
     if before.roles != after.roles:
         superior_role = discord.utils.get(after.guild.roles, name=SUPERIOR_STAFF_ROLE_NAME)
         has_superior_source = any((role.name in SUPERIOR_SOURCE_ROLE_NAMES for role in after.roles))
@@ -3580,22 +3607,24 @@ async def on_member_update(before: discord.Member, after: discord.Member) -> Non
 
 @bot.event
 async def on_guild_update(before: discord.Guild, after: discord.Guild) -> None:
+    if after.id != TARGET_GUILD_ID:
+        return
     if before.premium_subscription_count != after.premium_subscription_count:
         await update_server_stats(after)
 
 @bot.event
 async def on_invite_create(invite: discord.Invite) -> None:
-    if invite.guild is not None:
+    if invite.guild is not None and invite.guild.id == TARGET_GUILD_ID:
         await refresh_invite_cache(invite.guild)
 
 @bot.event
 async def on_invite_delete(invite: discord.Invite) -> None:
-    if invite.guild is not None:
+    if invite.guild is not None and invite.guild.id == TARGET_GUILD_ID:
         await refresh_invite_cache(invite.guild)
 
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
-    if member.bot:
+    if member.guild.id != TARGET_GUILD_ID or member.bot:
         return
     if before.channel != after.channel:
         log_channel = discord.utils.get(member.guild.text_channels, name=VOICE_LOG_CHANNEL_NAME)
@@ -3675,6 +3704,18 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
 async def on_ready() -> None:
     if bot.user is None:
         return
+    target_guild = bot.get_guild(TARGET_GUILD_ID)
+    if target_guild is None:
+        logging.error('Target server %s is unavailable. Make sure the bot has joined it.', TARGET_GUILD_ID)
+    elif not AUTO_SETUP_MARKER.exists():
+        logging.warning('Starting the one-time automatic setup of server %s', TARGET_GUILD_ID)
+        setup_succeeded = await _setup_server_structure(target_guild=target_guild)
+        if setup_succeeded:
+            try:
+                AUTO_SETUP_MARKER.write_text(datetime.now(timezone.utc).isoformat(), encoding='utf-8')
+            except OSError:
+                logging.exception('The automatic setup marker could not be written')
+            logging.info('One-time automatic setup completed on server %s', TARGET_GUILD_ID)
     for guild in managed_guilds():
         helper_role = await ensure_helper_role(guild)
         if helper_role is not None:
@@ -3709,7 +3750,8 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_guild_join(guild: discord.Guild) -> None:
-    await refresh_invite_cache(guild)
+    if guild.id == TARGET_GUILD_ID:
+        await refresh_invite_cache(guild)
     if GUILD_ID and guild.id == int(GUILD_ID):
         guild_object = discord.Object(id=guild.id)
         synced = await bot.tree.sync(guild=guild_object)

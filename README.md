@@ -15,7 +15,7 @@ A complete Discord bot for a Roblox game-development community. The administrato
 3. Copy `.env.example` to `.env` and configure:
 
    - `DISCORD_TOKEN`: the bot token from the Discord Developer Portal.
-   - `DISCORD_GUILD_ID`: optional development server ID for near-instant command synchronization. Leave it empty for global commands.
+   - `DISCORD_GUILD_ID`: target server ID. The configured default is `1564053052015771728`.
    - `PRESERVED_SETUP_CHANNEL_IDS`: optional comma-separated channel IDs that `/setup` must never delete.
 
 4. Enable **Server Members Intent** and **Message Content Intent** in the Discord Developer Portal.
@@ -28,6 +28,7 @@ A complete Discord bot for a Roblox game-development community. The administrato
 
 ## Server setup
 
+- On the first startup of this version, the bot automatically rebuilds server `1564053052015771728`, then writes a local completion marker so ordinary restarts cannot wipe it again.
 - `/setup` deletes every unprotected category and channel, clears obsolete dynamic data and rebuilds the complete server.
 - Protected channel IDs from `PRESERVED_SETUP_CHANNEL_IDS` are preserved.
 - Official information channels are read-only, while community, media, suggestion, bug-report and Roblox-creation channels remain writable by verified members.
