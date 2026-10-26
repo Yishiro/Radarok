@@ -222,36 +222,6 @@ UNCATEGORIZED_CHANNELS: tuple[ChannelSpec, ...] = ()
 
 SERVER_STRUCTURE = (
     CategorySpec(
-        "『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮",
-        (
-            ChannelSpec("╰、🏆・𝟏v7", "voice"),
-            ChannelSpec("╰、🏆・𝐏erry", "voice"),
-            ChannelSpec("━━━━━・✦・━━━━━", "voice"),
-            ChannelSpec("╰、⚜️・𝐒taff 1", "voice"),
-            ChannelSpec("╰、⚜️・𝐒taff 2", "voice"),
-            ChannelSpec("╰、⚜️・𝐒taff 3", "voice"),
-            ChannelSpec("╰、⚜️・𝐒taff 4", "voice"),
-            ChannelSpec("╰、⚜️・𝐒taff 5", "voice"),
-            ChannelSpec("╰、⚜️・𝐓est Vocal", "voice"),
-            ChannelSpec(
-                "╰、⚜️・𝐀ttente de move",
-                "voice",
-                member_connect=True,
-            ),
-        ),
-        staff_voice=True,
-    ),
-    CategorySpec(
-        "📊・SERVEUR STAT",
-        (
-            ChannelSpec("👥・Membres : 0", "voice"),
-            ChannelSpec("✅・Humains : 0", "voice"),
-            ChannelSpec("🤖・Bots : 0", "voice"),
-            ChannelSpec("💎・Boosts : 0", "voice"),
-        ),
-        stats_only=True,
-    ),
-    CategorySpec(
         "🔐・VÉRIFICATION",
         (
             ChannelSpec("📜・règlement", read_only=True),
@@ -359,21 +329,9 @@ SERVER_STRUCTURE = (
         (
             ChannelSpec("📜・règlement-tickets", read_only=True),
             ChannelSpec("🎫・ouvrir-un-ticket", read_only=True),
-            ChannelSpec("🐛・signaler-un-bug", read_only=True),
-            ChannelSpec("🚨・signaler-un-joueur", read_only=True),
-            ChannelSpec("💳・problème-achat", read_only=True),
-            ChannelSpec("🔐・appel-de-sanction", read_only=True),
-        ),
-    ),
-    CategorySpec(
-        "📝・RECRUTEMENT",
-        (
-            ChannelSpec("📋・informations-recrutement", read_only=True),
-            ChannelSpec("📝・postuler", read_only=True),
         ),
     ),
     CategorySpec("🎫・TICKETS OUVERTS", (), staff_only=True),
-    CategorySpec("⬆️・TICKETS REMONTÉS", (), staff_only=True),
     CategorySpec(
         "🔊・VOCAUX",
         (
@@ -398,7 +356,6 @@ SERVER_STRUCTURE = (
             ChannelSpec("🐛・bugs-à-corriger"),
             ChannelSpec("🧪・tests-internes"),
             ChannelSpec("📢・préparation-annonces"),
-            ChannelSpec("🏆・classement-helpers", read_only=True),
             ChannelSpec("📨・tickets-staff"),
             ChannelSpec("🔊・Réunion studio", "voice"),
         ),
@@ -530,6 +487,7 @@ LEGACY_BLOX_COMMANDS = (
     "trade-avis",
     "trade-fermer",
     "trade-profil",
+    "helper-classement",
 )
 LEVEL_ROLE_THRESHOLDS = (
     (35, "💫・Légende"),
@@ -1658,6 +1616,7 @@ class TicketPanelView(discord.ui.View):
         emoji="🆘",
         style=discord.ButtonStyle.primary,
         custom_id="community:ticket:assistance",
+        row=0,
     )
     async def assistance(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1671,6 +1630,7 @@ class TicketPanelView(discord.ui.View):
         emoji="🤝",
         style=discord.ButtonStyle.secondary,
         custom_id="community:ticket:partenariat",
+        row=0,
     )
     async def partnership(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1684,12 +1644,55 @@ class TicketPanelView(discord.ui.View):
         emoji="🛡️",
         style=discord.ButtonStyle.danger,
         custom_id="community:ticket:signalement",
+        row=0,
     )
     async def report(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
         await interaction.response.send_modal(
             TicketModal("signalement", "🛡️ Signaler un problème")
+        )
+
+    @discord.ui.button(
+        label="Bug",
+        emoji="🐛",
+        style=discord.ButtonStyle.secondary,
+        custom_id="community:ticket:bug",
+        row=1,
+    )
+    async def bug(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await interaction.response.send_modal(
+            TicketModal("bug", "🐛 Signaler un bug")
+        )
+
+    @discord.ui.button(
+        label="Problème d'achat",
+        emoji="💳",
+        style=discord.ButtonStyle.secondary,
+        custom_id="community:ticket:purchase",
+        row=1,
+    )
+    async def purchase(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await interaction.response.send_modal(
+            TicketModal("achat", "💳 Problème lié à un achat")
+        )
+
+    @discord.ui.button(
+        label="Appel de sanction",
+        emoji="🔐",
+        style=discord.ButtonStyle.secondary,
+        custom_id="community:ticket:appeal",
+        row=1,
+    )
+    async def appeal(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await interaction.response.send_modal(
+            TicketModal("appel-sanction", "🔐 Contester une sanction")
         )
 
 
@@ -2024,119 +2027,6 @@ class TicketControlView(discord.ui.View):
                 logging.exception(
                     "Impossible de journaliser le claim du ticket %s",
                     ticket_id,
-                )
-
-    @discord.ui.button(
-        label="Faire remonter",
-        emoji="⬆️",
-        style=discord.ButtonStyle.secondary,
-        custom_id="community:ticket:escalate",
-    )
-    async def escalate(
-        self, interaction: discord.Interaction, _: discord.ui.Button
-    ) -> None:
-        if (
-            not isinstance(interaction.user, discord.Member)
-            or not isinstance(interaction.channel, discord.TextChannel)
-            or (not is_helper(interaction.user) and not is_ticket_staff(interaction.user))
-        ):
-            await interaction.response.send_message(
-                "Cette action est réservée à l'équipe.", ephemeral=True
-            )
-            return
-        row = require_database().execute(
-            """
-            SELECT id, user_id, claimed_by, ticket_type FROM tickets
-            WHERE channel_id = ? AND status = 'open'
-            """,
-            (interaction.channel.id,),
-        ).fetchone()
-        if row is None or (
-            row[2] not in {None, interaction.user.id}
-            and not is_ticket_staff(interaction.user)
-        ):
-            await interaction.response.send_message(
-                "Tu ne peux pas faire remonter ce ticket.", ephemeral=True
-            )
-            return
-        superior_role, escalated_category = await ensure_superior_staff_area(
-            interaction.guild
-        )
-        if superior_role is None or escalated_category is None:
-            await interaction.response.send_message(
-                "Impossible de préparer l'espace du staff supérieur. Vérifie les "
-                "permissions du bot.",
-                ephemeral=True,
-            )
-            return
-        await interaction.response.send_message(
-            "Le ticket a été transmis au staff supérieur.", ephemeral=True
-        )
-        try:
-            await secure_escalated_ticket(
-                interaction.channel,
-                row[1],
-                superior_role,
-                escalated_category,
-            )
-        except discord.HTTPException:
-            logging.exception(
-                "Impossible de déplacer le ticket %s vers le Staff supérieur",
-                row[0],
-            )
-            await interaction.followup.send(
-                "Discord a refusé le déplacement du ticket.", ephemeral=True
-            )
-            return
-        require_database().execute(
-            """
-            UPDATE tickets SET escalated = 1, claimed_by = NULL,
-                               claimed_at = NULL
-            WHERE channel_id = ?
-            """,
-            (interaction.channel.id,),
-        )
-        require_database().commit()
-        await interaction.channel.send(
-            f"⬆️ {superior_role.mention} • Le ticket **#{row[0]}** "
-            f"({row[3]}) a été remonté par {interaction.user.mention}.\n"
-            "Seul le membre concerné et le Staff supérieur peuvent désormais y accéder."
-        )
-        log_channel = discord.utils.get(
-            interaction.guild.text_channels, name=TICKET_LOG_CHANNEL_NAME
-        )
-        if log_channel is not None:
-            escalated_at = int(time.time())
-            embed = discord.Embed(
-                title=f"⬆️ Ticket #{row[0]} remonté",
-                colour=discord.Colour.purple(),
-                timestamp=datetime.now(timezone.utc),
-            )
-            embed.add_field(
-                name="Ticket",
-                value=f"{interaction.channel.mention}\nType : **{row[3]}**",
-                inline=True,
-            )
-            embed.add_field(
-                name="Remonté par",
-                value=f"{interaction.user.mention}\n`{interaction.user.id}`",
-                inline=True,
-            )
-            embed.add_field(
-                name="Accès",
-                value=superior_role.mention,
-                inline=True,
-            )
-            embed.add_field(
-                name="Date et heure exactes",
-                value=f"<t:{escalated_at}:F>\n(<t:{escalated_at}:R>)",
-                inline=False,
-            )
-            try:
-                await log_channel.send(embed=embed)
-            except discord.HTTPException:
-                logging.exception(
-                    "Impossible de journaliser la remontée du ticket %s", row[0]
                 )
 
     @discord.ui.button(
@@ -6313,8 +6203,7 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
         value=(
             "`/helper-ajouter`\n"
             "`/helper-retirer`\n"
-            "`/helper-points-definir`\n"
-            "`/helper-classement`"
+            "`/helper-points-definir`"
         ),
         inline=False,
     )
@@ -7962,8 +7851,8 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             changelog_embed.add_field(
                 name="🚀 Mise en place initiale",
                 value=(
-                    "Création de la structure communautaire, des tickets, recrutements, "
-                    "vocaux temporaires, niveaux, invitations, giveaways et protections."
+                    "Création de la structure communautaire, du centre de tickets, "
+                    "des niveaux, invitations, giveaways et protections."
                 ),
                 inline=False,
             )
@@ -8201,14 +8090,6 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 ),
                 inline=False,
             )
-            ticket_rules_embed.add_field(
-                name="📝 Recrutement",
-                value=(
-                    "Les candidatures ne se font pas ici. Consulte la catégorie "
-                    "**RECRUTEMENT** et utilise son bouton pour postuler."
-                ),
-                inline=False,
-            )
             ticket_rules_embed.set_footer(
                 text="Tout abus du système de tickets peut être sanctionné"
             )
@@ -8222,7 +8103,10 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                     "Un salon privé sera créé entre toi et l'équipe.\n\n"
                     "🆘 **Assistance** — question ou problème général\n"
                     "🤝 **Partenariat** — proposer une collaboration\n"
-                    "🛡️ **Signalement** — signaler un membre ou un comportement"
+                    "🛡️ **Signalement** — signaler un membre ou un comportement\n"
+                    "🐛 **Bug** — signaler un problème dans un jeu\n"
+                    "💳 **Problème d'achat** — demander de l'aide pour une transaction\n"
+                    "🔐 **Appel de sanction** — contester calmement une sanction"
                 ),
                 colour=discord.Colour.orange(),
             )
@@ -8323,12 +8207,10 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 )
 
         helper_role = await ensure_helper_role(guild)
-        await ensure_superior_staff_area(guild)
         if helper_role is not None:
             await reconcile_helper_ticket_permissions(guild, helper_role)
         await ensure_discord_audit_log_channel(guild)
         await refresh_command_guides(guild)
-        await update_helper_leaderboard(guild)
 
         fallback_message = (
             f"\n⚠️ **{stage_fallbacks}** salon(s) de conférence ont été créés en "
@@ -8730,9 +8612,8 @@ async def publish_bot_update(guild: discord.Guild) -> None:
     embed.add_field(
         name="📊 Statistiques et activité",
         value=(
-            "Compteurs Membres/Humains/Bots/Boosts, XP par messages et temps vocal, "
-            "rôles de progression, carte `/niveau`, `/classement`, ajout et remise "
-            "à zéro des niveaux."
+            "XP par messages et temps vocal, rôles de progression, carte `/niveau`, "
+            "`/classement`, ajout et remise à zéro des niveaux."
         ),
         inline=False,
     )
@@ -8792,11 +8673,10 @@ async def publish_bot_update(guild: discord.Guild) -> None:
     embed.add_field(
         name="🆘 Helpers et tickets",
         value=(
-            "Assistance, signalements, partenariats et recrutements privés, formulaires, "
-            "claim exclusif, transmission au staff supérieur, fermeture confirmée, "
-            "rôle automatique, permissions réparées au redémarrage, points Helpers, "
-            "classement et transcriptions. Les tickets remontés sont déplacés dans "
-            "une catégorie privée réservée au rôle Staff supérieur."
+            "Un centre unique pour l'assistance, les partenariats, les signalements, "
+            "les bugs, les problèmes d'achat et les appels de sanction. Les tickets "
+            "disposent d'un formulaire, d'un claim exclusif, d'une fermeture confirmée, "
+            "de permissions privées, de points Helpers et de transcriptions."
         ),
         inline=False,
     )
@@ -9039,7 +8919,6 @@ async def setup_hook() -> None:
     bot.add_view(VerificationView())
     bot.add_view(RoleSelectionView())
     bot.add_view(TicketPanelView())
-    bot.add_view(RecruitmentPanelView())
     bot.add_view(TicketControlView())
     bot.add_view(GiveawayView())
     bot.add_view(CommunityEventView())
@@ -9834,7 +9713,6 @@ async def on_ready() -> None:
         return
 
     for guild in managed_guilds():
-        await ensure_superior_staff_area(guild)
         helper_role = await ensure_helper_role(guild)
         if helper_role is not None:
             await reconcile_helper_ticket_permissions(guild, helper_role)

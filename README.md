@@ -53,13 +53,7 @@ utilisé, sans nom, identifiant ou marque imposés.
   les informations sur les jeux sont en lecture seule pour les membres.
 - Les discussions, médias, clips, suggestions, signalements de bugs et espaces
   de création Roblox restent ouverts aux membres vérifiés.
-- Toutes les catégories utilisent le décor `○─────Nom─────➤`, sauf les Vocaux
-  Staff qui reprennent le décor spécial `『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮`.
-- Les catégories Vocaux Staff et Serveur Stat sont créées en premier. Les
-  membres voient les bureaux 1v7, Perry, Staff 1 à 5 et Test Vocal, mais ne
-  peuvent rejoindre que la salle d'attente ; le staff accède à tous les bureaux.
-- Les compteurs Membres, Humains, Bots et Boosts sont affichés dans des salons
-  vocaux verrouillés et actualisés automatiquement.
+- Toutes les catégories utilisent le décor `○─────Nom─────➤`.
 - Les espaces Jeux, Tests, Événements, Création Roblox et Partenariat sont inclus. Seul le rôle
   `🤝・Partenaire` peut écrire dans le chat partenaire.
 - Elle crée les rôles du studio, communautaires, de notifications, de plateformes
@@ -106,8 +100,8 @@ utilisé, sans nom, identifiant ou marque imposés.
 
 ## Tickets
 
-- `/setup` publie un panel Assistance, Partenariat et Signalement, ainsi qu'un
-  espace de recrutement séparé.
+- `/setup` publie un centre unique permettant d'ouvrir un ticket Assistance,
+  Partenariat, Signalement, Bug, Problème d'achat ou Appel de sanction.
 - Chaque formulaire crée un salon privé visible par son auteur et le staff.
 - Un membre ne peut ouvrir qu'un ticket de chaque type à la fois.
 - Les helpers accèdent uniquement aux tickets Assistance et Signalement.
@@ -117,18 +111,10 @@ utilisé, sans nom, identifiant ou marque imposés.
   staff supérieur conserve toujours l'accès.
 - Chaque claim est envoyé dans `📨・tickets-staff` avec le ticket, son auteur,
   le membre du staff assigné, ainsi que la date et l'heure exactes.
-- Le helper peut clôturer le ticket ou le faire remonter au staff supérieur.
-- Le rôle `🔱・Staff supérieur` et la catégorie privée
-  `⬆️・TICKETS REMONTÉS` sont créés automatiquement au démarrage.
-- Les membres possédant les rôles Fondateur, Responsable ou Administrateur
-  reçoivent automatiquement le rôle Staff supérieur.
-- Lors d'une remontée, le ticket est déplacé dans cette catégorie et ses
-  permissions sont reconstruites : seuls son auteur, le Staff supérieur et le
-  bot conservent l'accès. La remontée est aussi datée dans `📨・tickets-staff`.
-- Un ticket résolu rapporte un point au helper assigné et actualise le
-  classement des helpers.
-- `/helper-ajouter`, `/helper-retirer`, `/helper-points-definir` et
-  `/helper-classement` permettent au staff de gérer le système.
+- Un ticket résolu peut toujours rapporter un point au helper assigné, sans
+  créer de salon de classement public ou privé.
+- `/helper-ajouter`, `/helper-retirer` et `/helper-points-definir` permettent au
+  staff de gérer les Helpers.
 - Un Helper peut uniquement consulter `/warns` et `/infos-joueur` parmi les
   commandes réservées à l'équipe.
 - L'auteur ou le staff peut demander sa fermeture, avec confirmation.
