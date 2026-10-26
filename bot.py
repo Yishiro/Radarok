@@ -34,7 +34,7 @@ PRESERVED_SETUP_CHANNEL_IDS = {
     for channel_id in os.getenv("PRESERVED_SETUP_CHANNEL_IDS", "").split(",")
     if channel_id.strip().isdigit()
 }
-BOT_UPDATE_VERSION = "2026.08.11-universel"
+BOT_UPDATE_VERSION = "2026.10.26-studio-roblox"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -120,7 +120,7 @@ ROLE_SPECS = (
         True,
     ),
     RoleSpec(
-        "⚙️・Responsable",
+        "⚙️・Responsable du studio",
         0xE67E22,
         discord.Permissions(
             manage_guild=True,
@@ -171,7 +171,12 @@ ROLE_SPECS = (
         discord.Permissions(manage_messages=True, moderate_members=True),
         True,
     ),
-    RoleSpec("🎨・Graphiste", 0x9B59B6, hoist=True),
+    RoleSpec("💻・Développeur", 0x5865F2, hoist=True),
+    RoleSpec("🧱・Builder", 0xE67E22, hoist=True),
+    RoleSpec("🎨・UI Designer", 0x9B59B6, hoist=True),
+    RoleSpec("🖌️・Modeleur 3D", 0x1ABC9C, hoist=True),
+    RoleSpec("🎵・Sound Designer", 0xE91E63, hoist=True),
+    RoleSpec("📢・Community Manager", 0xF39C12, hoist=True),
     RoleSpec("🤝・Partenaire", 0x1ABC9C, hoist=True),
     RoleSpec("⭐・VIP", 0xF39C12, hoist=True),
     RoleSpec("💎・Booster", 0xEB459E, hoist=True),
@@ -181,7 +186,7 @@ ROLE_SPECS = (
     RoleSpec("💎・Maître recruteur", 0x9B59B6, hoist=True),
     RoleSpec("🎥・Créateur de contenu", 0xE91E63, hoist=True),
     RoleSpec("🏆・Gagnant Giveaway", 0xF4D03F, hoist=True),
-    RoleSpec("👑・Capitaine d'équipage", 0xD4AF37, hoist=True),
+    RoleSpec("🧪・Bêta testeur", 0x00B894, hoist=True),
     RoleSpec("🥇・Champion événement", 0xF1C40F, hoist=True),
     RoleSpec("🥈・Finaliste événement", 0xBDC3C7, hoist=True),
     RoleSpec("🥉・Troisième événement", 0xCD7F32, hoist=True),
@@ -193,20 +198,18 @@ ROLE_SPECS = (
     RoleSpec("🎉・Giveaways", 0xF1C40F),
     RoleSpec("📢・Annonces", 0xE67E22),
     RoleSpec("🤝・Partenariats", 0x1ABC9C),
-    RoleSpec("📰・Actualités Blox Fruits", 0x3498DB),
-    RoleSpec("⚔️・PvP", 0xC0392B),
-    RoleSpec("🏰・Raids", 0x8E44AD),
-    RoleSpec("🌊・Sea Events", 0x2980B9),
-    RoleSpec("🐉・V4", 0x8E44AD),
-    RoleSpec("🔄・Trades", 0x16A085),
+    RoleSpec("📰・Mises à jour", 0x3498DB),
+    RoleSpec("🚨・Admin Abuse", 0xC0392B),
+    RoleSpec("🎮・Nouveaux jeux", 0x8E44AD),
+    RoleSpec("🧪・Sessions de test", 0x00B894),
+    RoleSpec("📅・Événements", 0x2980B9),
     RoleSpec("🆘・Helper", 0x27AE60, hoist=True),
-    RoleSpec("👤・Human", 0xD5D8DC),
-    RoleSpec("🐇・Rabbit", 0xF5B7B1),
-    RoleSpec("🦈・Shark", 0x3498DB),
-    RoleSpec("😇・Angel", 0xF7DC6F),
-    RoleSpec("🧟・Ghoul", 0x7D3C98),
-    RoleSpec("🤖・Cyborg", 0x707B7C),
-    RoleSpec("🐉・Draco", 0xC0392B),
+    RoleSpec("🎮・Joueur", 0x3498DB),
+    RoleSpec("💡・Créateur", 0xF1C40F),
+    RoleSpec("🐛・Bug Hunter", 0xE74C3C),
+    RoleSpec("📱・Mobile", 0x2ECC71),
+    RoleSpec("💻・PC", 0x5865F2),
+    RoleSpec("🎮・Console", 0x9B59B6),
     RoleSpec("💫・Légende", 0xF1C40F),
     RoleSpec("🥇・Vétéran", 0xE67E22),
     RoleSpec("🥈・Actif", 0xBDC3C7),
@@ -263,8 +266,75 @@ SERVER_STRUCTURE = (
             ChannelSpec("📢・annonces", read_only=True),
             ChannelSpec("🎭・choix-des-rôles", read_only=True),
             ChannelSpec("❓・faq", read_only=True),
+            ChannelSpec("🔗・liens-officiels", read_only=True),
             ChannelSpec("📰・changelog-serveur", read_only=True),
             ChannelSpec("💎・merci-boosts", read_only=True),
+        ),
+    ),
+    CategorySpec(
+        "📢・ACTUALITÉS DU STUDIO",
+        (
+            ChannelSpec("🛠️・avancement", read_only=True),
+            ChannelSpec("📰・mises-à-jour", read_only=True),
+            ChannelSpec("🚨・admin-abuse", read_only=True),
+            ChannelSpec("🎮・nouveaux-jeux", read_only=True),
+            ChannelSpec("🗺️・roadmap", read_only=True),
+        ),
+    ),
+    CategorySpec(
+        "🎮・NOS JEUX",
+        (
+            ChannelSpec("🎯・jeu-principal", read_only=True),
+            ChannelSpec("🧪・jeu-en-développement", read_only=True),
+            ChannelSpec("🗄️・anciens-jeux", read_only=True),
+            ChannelSpec("🔗・liens-des-jeux", read_only=True),
+            ChannelSpec("📊・statut-des-serveurs", read_only=True),
+        ),
+    ),
+    CategorySpec(
+        "💬・COMMUNAUTÉ",
+        (
+            ChannelSpec("💬・discussion"),
+            ChannelSpec("🎮・discussion-jeux"),
+            ChannelSpec("😂・memes"),
+            ChannelSpec("📷・médias"),
+            ChannelSpec("🎥・clips"),
+            ChannelSpec("💡・suggestions"),
+            ChannelSpec("🐛・signalement-de-bugs"),
+            ChannelSpec("🤖・commandes-bots"),
+            ChannelSpec("🎉・giveaways", read_only=True),
+        ),
+    ),
+    CategorySpec(
+        "🧪・TESTS ET RETOURS",
+        (
+            ChannelSpec("📋・devenir-testeur", read_only=True),
+            ChannelSpec("🧪・annonces-tests", read_only=True),
+            ChannelSpec("📝・retours-des-testeurs", read_only=True, write_roles=("🧪・Bêta testeur",)),
+            ChannelSpec("🐞・bugs-des-tests", read_only=True, write_roles=("🧪・Bêta testeur",)),
+            ChannelSpec("🔒・accès-aux-tests", read_only=True),
+        ),
+    ),
+    CategorySpec(
+        "🎪・ÉVÉNEMENTS",
+        (
+            ChannelSpec("📅・calendrier", read_only=True),
+            ChannelSpec("🎪・annonces-événements", read_only=True),
+            ChannelSpec("🚨・planning-admin-abuse", read_only=True),
+            ChannelSpec("🎁・concours", read_only=True),
+            ChannelSpec("🏆・résultats", read_only=True),
+        ),
+    ),
+    CategorySpec(
+        "💻・CRÉATION ROBLOX",
+        (
+            ChannelSpec("💻・développement"),
+            ChannelSpec("🧱・building"),
+            ChannelSpec("🎨・interfaces-et-design"),
+            ChannelSpec("🖌️・modélisation"),
+            ChannelSpec("🎵・sons-et-musiques"),
+            ChannelSpec("💡・idées-de-jeux"),
+            ChannelSpec("📚・ressources-roblox"),
         ),
     ),
     CategorySpec(
@@ -278,77 +348,21 @@ SERVER_STRUCTURE = (
         ),
     ),
     CategorySpec(
-        "💬・COMMUNAUTÉ",
-        (
-            ChannelSpec("💬・discussion"),
-            ChannelSpec("😂・memes"),
-            ChannelSpec("📷・médias"),
-            ChannelSpec("💡・suggestions"),
-            ChannelSpec("📊・sondages", read_only=True),
-            ChannelSpec("🏆・level", read_only=True),
-            ChannelSpec("🤖・commandes-bots"),
-            ChannelSpec("🎉・giveaways", read_only=True),
-        ),
-    ),
-    CategorySpec(
-        "🎪・ÉVÉNEMENT",
-        (
-            ChannelSpec("🎪・annonces-événement", read_only=True),
-            ChannelSpec("🥇・événement", "stage"),
-            ChannelSpec("🥈・événement", "stage"),
-            ChannelSpec("🥉・événement", "stage"),
-        ),
-    ),
-    CategorySpec(
-        "🎨・PARTAGE",
-        (
-            ChannelSpec("🧠・idées"),
-            ChannelSpec("🎬・vidéos"),
-            ChannelSpec("🎥・clips-communauté"),
-            ChannelSpec("🖌️・créations"),
-        ),
-    ),
-    CategorySpec(
         "🤝・PARTENARIAT",
         (
             ChannelSpec("🤝・partenaire", read_only=True),
-            ChannelSpec(
-                "🗣️・chat-partenaire",
-                read_only=True,
-                write_roles=("🤝・Partenaire",),
-            ),
+            ChannelSpec("🗣️・chat-partenaire", read_only=True, write_roles=("🤝・Partenaire",)),
         ),
     ),
-    CategorySpec(
-        "🍈・BLOX FRUITS",
-        (
-            ChannelSpec("👀・discussion-blox-fruit"),
-            ChannelSpec("⚔️・pvp"),
-            ChannelSpec("🏰・raids-et-donjons"),
-            ChannelSpec("🌊・sea-events-et-boss"),
-            ChannelSpec("🤝・trades"),
-            ChannelSpec("📢・marché-trades", read_only=True),
-            ChannelSpec("🆘・entraide-blox-fruit"),
-            ChannelSpec("📰・actualités-et-stocks", read_only=True),
-        ),
-    ),
-    CategorySpec(
-        "🏴‍☠️・ÉQUIPAGES",
-        (
-            ChannelSpec("📋・présentation-des-équipages", read_only=True),
-            ChannelSpec("📢・recrutement-équipage", read_only=True),
-            ChannelSpec("📄・cv-joueurs", read_only=True),
-        ),
-    ),
-    CategorySpec("🤝・TRADES PRIVÉS", (), staff_only=True),
-    CategorySpec("🔒・ÉQUIPAGES PRIVÉS", (), staff_only=True),
     CategorySpec(
         "🎟️・SUPPORT",
         (
             ChannelSpec("📜・règlement-tickets", read_only=True),
             ChannelSpec("🎫・ouvrir-un-ticket", read_only=True),
-            ChannelSpec("🤝・partenariats", read_only=True),
-            ChannelSpec("🛡️・signalements", read_only=True),
+            ChannelSpec("🐛・signaler-un-bug", read_only=True),
+            ChannelSpec("🚨・signaler-un-joueur", read_only=True),
+            ChannelSpec("💳・problème-achat", read_only=True),
+            ChannelSpec("🔐・appel-de-sanction", read_only=True),
         ),
     ),
     CategorySpec(
@@ -364,25 +378,29 @@ SERVER_STRUCTURE = (
         "🔊・VOCAUX",
         (
             ChannelSpec("🔊・Général", "voice"),
-            ChannelSpec("🎮・Blox Fruits", "voice"),
-            ChannelSpec("⚔️・PvP", "voice", 10),
-            ChannelSpec("🏰・Raids", "voice", 6),
-            ChannelSpec("🌊・Sea Events", "voice", 12),
+            ChannelSpec("🎮・En jeu", "voice"),
+            ChannelSpec("🧪・Bêta test", "voice", 12),
+            ChannelSpec("💻・Développement", "voice", 10),
+            ChannelSpec("🎵・Détente", "voice"),
             ChannelSpec("😴・AFK", "voice"),
         ),
     ),
     CategorySpec(
-        "⚓・CRÉE TON ÉQUIPAGE",
+        "➕・CRÉE TON VOCAL",
         (ChannelSpec("➕・Créer un vocal", "voice"),),
     ),
     CategorySpec(
         "🔒・ÉQUIPE",
         (
-            ChannelSpec("💬・discussion-staff"),
+            ChannelSpec("💬・discussion-équipe"),
             ChannelSpec("📋・organisation"),
+            ChannelSpec("🗺️・roadmap-interne"),
+            ChannelSpec("🐛・bugs-à-corriger"),
+            ChannelSpec("🧪・tests-internes"),
+            ChannelSpec("📢・préparation-annonces"),
             ChannelSpec("🏆・classement-helpers", read_only=True),
             ChannelSpec("📨・tickets-staff"),
-            ChannelSpec("🔊・Vocal staff", "voice"),
+            ChannelSpec("🔊・Réunion studio", "voice"),
         ),
         staff_only=True,
     ),
@@ -407,23 +425,21 @@ NOTIFICATION_ROLES = (
     "🎉・Giveaways",
     "📢・Annonces",
     "🤝・Partenariats",
-    "📰・Actualités Blox Fruits",
+    "📰・Mises à jour",
+    "🚨・Admin Abuse",
+    "🎮・Nouveaux jeux",
+    "🧪・Sessions de test",
+    "📅・Événements",
 )
 ACTIVITY_ROLES = (
-    "⚔️・PvP",
-    "🏰・Raids",
-    "🌊・Sea Events",
-    "🐉・V4",
-    "🔄・Trades",
+    "🎮・Joueur",
+    "💡・Créateur",
+    "🐛・Bug Hunter",
 )
-RACE_ROLES = (
-    "👤・Human",
-    "🐇・Rabbit",
-    "🦈・Shark",
-    "😇・Angel",
-    "🧟・Ghoul",
-    "🤖・Cyborg",
-    "🐉・Draco",
+PLATFORM_ROLES = (
+    "📱・Mobile",
+    "💻・PC",
+    "🎮・Console",
 )
 
 MEMBER_ROLE_NAME = "✅・Membre"
@@ -442,7 +458,7 @@ CREW_PRESENTATION_CHANNEL_NAME = stylize_channel_name(
     "📋・présentation-des-équipages"
 )
 CREW_RECRUITMENT_CHANNEL_NAME = stylize_channel_name("📢・recrutement-équipage")
-CLIPS_CHANNEL_NAME = stylize_channel_name("🎥・clips-communauté")
+CLIPS_CHANNEL_NAME = stylize_channel_name("🎥・clips")
 BOOST_THANKS_CHANNEL_NAME = stylize_channel_name("💎・merci-boosts")
 EVENT_ANNOUNCEMENT_CHANNEL_NAME = stylize_channel_name("🎪・annonces-événement")
 TRADE_MARKET_CHANNEL_NAME = stylize_channel_name("📢・marché-trades")
@@ -457,9 +473,9 @@ SANCTION_LOG_CHANNEL_NAME = stylize_channel_name("⚖️・sanctions")
 DISCORD_AUDIT_LOG_CHANNEL_NAME = stylize_channel_name("🧾・logs-discord")
 JOURNALS_CATEGORY_NAME = decorate_category_name("🛡️・JOURNAUX")
 COMMANDS_CHANNEL_NAME = stylize_channel_name("🤖・commandes-bots")
-TEMP_VOICE_CATEGORY_NAME = decorate_category_name("⚓・CRÉE TON ÉQUIPAGE")
+TEMP_VOICE_CATEGORY_NAME = decorate_category_name("➕・CRÉE TON VOCAL")
 TEMP_VOICE_TRIGGER_NAME = stylize_channel_name("➕・Créer un vocal")
-TEMP_VOICE_PREFIX = "🎙️・𝐄quipage de "
+TEMP_VOICE_PREFIX = "🎙️・𝐕ocal de "
 TICKET_PANEL_CHANNEL_NAME = stylize_channel_name("🎫・ouvrir-un-ticket")
 TICKET_RULES_CHANNEL_NAME = stylize_channel_name("📜・règlement-tickets")
 RECRUITMENT_INFO_CHANNEL_NAME = stylize_channel_name("📋・informations-recrutement")
@@ -473,7 +489,7 @@ HELPER_ROLE_NAME = "🆘・Helper"
 SUPERIOR_STAFF_ROLE_NAME = "🔱・Staff supérieur"
 SUPERIOR_SOURCE_ROLE_NAMES = (
     "👑・Fondateur",
-    "⚙️・Responsable",
+    "⚙️・Responsable du studio",
     "🛡️・Administrateur",
 )
 STAFF_VOICE_CATEGORY_NAME = decorate_category_name(
@@ -482,17 +498,39 @@ STAFF_VOICE_CATEGORY_NAME = decorate_category_name(
 SERVER_STATS_CATEGORY_NAME = decorate_category_name("📊・SERVEUR STAT")
 STAFF_ROLE_NAMES = (
     "👑・Fondateur",
-    "⚙️・Responsable",
+    "⚙️・Responsable du studio",
     "🛡️・Administrateur",
     "🔨・Modérateur",
     "🧪・Modérateur en test",
     SUPERIOR_STAFF_ROLE_NAME,
+    "💻・Développeur",
+    "📢・Community Manager",
 )
 MESSAGE_XP_COOLDOWN = 60
 MESSAGE_XP_MIN = 15
 MESSAGE_XP_MAX = 25
 VOICE_XP_PER_MINUTE = 5
 CREW_CREATION_LEVEL = 10
+LEGACY_BLOX_COMMANDS = (
+    "cv-creer",
+    "equipage-creer",
+    "equipage-creer-pour",
+    "equipage-recrutement",
+    "equipage-commandes",
+    "equipage-inviter",
+    "equipage-exclure",
+    "equipage-vice-capitaine",
+    "equipage-limite",
+    "equipage-membres",
+    "equipage-transferer",
+    "equipage-classement",
+    "equipage-quitter",
+    "equipage-supprimer",
+    "trade-publier",
+    "trade-avis",
+    "trade-fermer",
+    "trade-profil",
+)
 LEVEL_ROLE_THRESHOLDS = (
     (35, "💫・Légende"),
     (20, "🥇・Vétéran"),
@@ -544,7 +582,7 @@ SOCIAL_BUMP_MESSAGES = {
     ),
     stylize_channel_name("🟣・twitch"): (
         "🟣 **Twitch officiel**\n"
-        "Suis la chaîne pour ne manquer aucun live et rejoindre l'équipage en direct !"
+        "Suis la chaîne pour ne manquer aucun live et rejoindre la communauté en direct !"
     ),
     stylize_channel_name("🎵・tiktok"): (
         "🎵 **TikTok officiel**\n"
@@ -1422,17 +1460,17 @@ class RoleSelectionView(discord.ui.View):
         self.add_item(
             SelfRoleSelect(
                 role_names=ACTIVITY_ROLES,
-                placeholder="Choisis tes activités Blox Fruits",
+                placeholder="Choisis ton profil communautaire",
                 custom_id="community:roles:activities",
                 max_values=len(ACTIVITY_ROLES),
             )
         )
         self.add_item(
             SelfRoleSelect(
-                role_names=RACE_ROLES,
-                placeholder="Choisis ta race Blox Fruits",
-                custom_id="community:roles:race",
-                max_values=1,
+                role_names=PLATFORM_ROLES,
+                placeholder="Choisis tes plateformes Roblox",
+                custom_id="community:roles:platforms",
+                max_values=len(PLATFORM_ROLES),
             )
         )
 
@@ -2683,7 +2721,7 @@ def staff_overwrites(
     }
     for role_name in (
         "👑・Fondateur",
-        "⚙️・Responsable",
+        "⚙️・Responsable du studio",
         "🛡️・Administrateur",
         "🔨・Modérateur",
         "🧪・Modérateur en test",
@@ -3080,7 +3118,7 @@ async def process_member_invite(member: discord.Member) -> None:
 
 def build_voice_help_embed() -> discord.Embed:
     return discord.Embed(
-        title="⚓ Gestion de ton équipage vocal",
+        title="🔊 Gestion de ton vocal temporaire",
         description=(
             f"Rejoins **{TEMP_VOICE_TRIGGER_NAME}** pour créer automatiquement "
             f"un salon nommé `{TEMP_VOICE_PREFIX}ton pseudo`.\n\n"
@@ -3206,7 +3244,7 @@ async def vocal_invite(
         )
     )
     invite_embed = discord.Embed(
-        title="⚓ Invitation dans un équipage vocal",
+        title="🔊 Invitation dans un vocal temporaire",
         description=(
             f"**{interaction.user.display_name}** t'invite à rejoindre "
             f"**{channel.name}** sur **{interaction.guild.name}**.\n\n"
@@ -6291,9 +6329,8 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
         inline=False,
     )
     embed.add_field(
-        name="🏴‍☠️ Équipages, niveaux et invitations",
+        name="🎮 Communauté, niveaux et invitations",
         value=(
-            "`/equipage-creer-pour` • créer un équipage pour un membre\n"
             "`/suggestion-statut` • décision officielle\n"
             "`/niveau-donner`\n"
             "`/niveau-reinitialiser`\n"
@@ -6304,9 +6341,8 @@ async def admin_commands_command(interaction: discord.Interaction) -> None:
     embed.add_field(
         name="🎫 Gestion par boutons",
         value=(
-            "Claim, fermeture et transmission des tickets ; acceptation ou refus "
-            "des candidatures d'équipages ; contrôles persistants des événements "
-            "et giveaways."
+            "Claim, fermeture et transmission des tickets ; contrôles persistants "
+            "des événements, suggestions et giveaways."
         ),
         inline=False,
     )
@@ -7709,7 +7745,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             rules_embed = discord.Embed(
                 title=f"📜 Règlement de {guild.name}",
                 description=(
-                    "Bienvenue dans l'équipage ! En rejoignant et en utilisant ce "
+                    "Bienvenue dans la communauté ! En rejoignant et en utilisant ce "
                     "serveur, tu acceptes les règles ci-dessous. Elles permettent de "
                     "garder une communauté agréable, sûre et accessible à tous."
                 ),
@@ -7750,11 +7786,11 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 inline=False,
             )
             rules_embed.add_field(
-                name="5・Blox Fruits et échanges",
+                name="5・Roblox, jeux et achats",
                 value=(
-                    "Les arnaques, faux giveaways, liens Roblox suspects, ventes contre "
-                    "de l'argent réel et échanges de comptes sont interdits. Chaque "
-                    "échange reste sous la responsabilité des participants."
+                    "Les arnaques, faux giveaways, liens Roblox suspects, ventes de "
+                    "comptes et demandes d'identifiants sont interdits. Signale tout "
+                    "problème d'achat via un ticket sans publier de données privées."
                 ),
                 inline=False,
             )
@@ -7763,7 +7799,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 value=(
                     "Ne partage aucun script, exploit, logiciel malveillant, méthode de "
                     "piratage ou contenu destiné à contourner les règles de Roblox, "
-                    "Discord ou Blox Fruits."
+                    "Discord ou aux jeux Roblox."
                 ),
                 inline=False,
             )
@@ -7841,8 +7877,8 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 title="🎭 Choisis tes rôles",
                 description=(
                     "Utilise les menus ci-dessous pour personnaliser tes notifications, "
-                    "indiquer tes activités Blox Fruits et choisir ta race.\n\n"
-                    "Tu peux sélectionner plusieurs activités, mais une seule race."
+                    "choisir ton profil communautaire et indiquer les plateformes sur "
+                    "lesquelles tu joues à Roblox."
                 ),
                 colour=discord.Colour.orange(),
             )
@@ -7872,7 +7908,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 name="🎭 Comment obtenir mes rôles ?",
                 value=(
                     "Utilise les menus du salon choix-des-rôles pour sélectionner tes "
-                    "notifications, tes activités Blox Fruits et ta race."
+                    "notifications, ton profil et tes plateformes Roblox."
                 ),
                 inline=False,
             )
@@ -7885,9 +7921,9 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
                 inline=False,
             )
             faq_embed.add_field(
-                name="⚓ Comment créer un vocal privé ?",
+                name="🔊 Comment créer un vocal privé ?",
                 value=(
-                    "Rejoins le salon Créer un vocal. Ton équipage sera créé "
+                    "Rejoins le salon Créer un vocal. Ton salon temporaire sera créé "
                     "automatiquement. Gère-le avec `/vocal-limite`, `/vocal-prive`, "
                     "`/vocal-inviter` et `/vocal-expulser`."
                 ),
@@ -7933,6 +7969,51 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             )
             changelog_embed.set_footer(text=guild.name)
             await changelog_channel.send(embed=changelog_embed)
+
+        studio_information = {
+            stylize_channel_name("🛠️・avancement"): (
+                "🛠️ Avancement des projets",
+                "L'équipe publiera ici les étapes importantes du développement : systèmes terminés, cartes, interfaces, tests et objectifs en cours.",
+            ),
+            stylize_channel_name("📰・mises-à-jour"): (
+                "📰 Mises à jour",
+                "Retrouve ici les changelogs de nos jeux, les nouveautés, corrections de bugs et améliorations déployées.",
+            ),
+            stylize_channel_name("🚨・admin-abuse"): (
+                "🚨 Sessions Admin Abuse",
+                "Les dates, horaires, jeux concernés et consignes des prochaines sessions d'Admin Abuse seront annoncés ici.",
+            ),
+            stylize_channel_name("🎮・nouveaux-jeux"): (
+                "🎮 Nouveaux jeux",
+                "Chaque nouveau projet Roblox sera présenté ici avec sa description, son lien et les informations d'accès.",
+            ),
+            stylize_channel_name("🗺️・roadmap"): (
+                "🗺️ Roadmap publique",
+                "Cette feuille de route présente les fonctionnalités prévues. Les dates restent indicatives et peuvent évoluer pendant le développement.",
+            ),
+            stylize_channel_name("📋・devenir-testeur"): (
+                "📋 Devenir bêta testeur",
+                "Les ouvertures de candidatures et conditions d'accès aux tests seront publiées ici. Ne contactez pas l'équipe en privé pour demander le rôle.",
+            ),
+            stylize_channel_name("🐛・signalement-de-bugs"): (
+                "🐛 Signaler un bug",
+                "Indique le jeu, la plateforme, les étapes pour reproduire le problème et ajoute une capture ou vidéo si possible. Ne partage aucune donnée personnelle.",
+            ),
+            stylize_channel_name("🔗・liens-officiels"): (
+                "🔗 Liens officiels",
+                "Seuls les liens publiés dans ce salon sont considérés comme officiels. Ne saisis jamais ton mot de passe Roblox sur un site envoyé en message privé.",
+            ),
+        }
+        for channel_name, (title, description) in studio_information.items():
+            info_channel = discord.utils.get(guild.text_channels, name=channel_name)
+            if info_channel is not None:
+                await info_channel.send(
+                    embed=discord.Embed(
+                        title=title,
+                        description=description,
+                        colour=discord.Colour.blurple(),
+                    )
+                )
 
         if trade_channel is not None:
             trade_embed = discord.Embed(
@@ -8060,7 +8141,7 @@ async def _setup_server_structure(interaction: discord.Interaction) -> None:
             clips_embed = discord.Embed(
                 title="🎥 Règles des clips de la communauté",
                 description=(
-                    "Partage ici tes meilleurs moments Blox Fruits, YouTube ou Twitch."
+                    "Partage ici tes meilleurs moments sur nos jeux Roblox, YouTube ou Twitch."
                 ),
                 colour=discord.Colour.purple(),
             )
@@ -8683,30 +8764,28 @@ async def publish_bot_update(guild: discord.Guild) -> None:
         inline=False,
     )
     embed.add_field(
-        name="🌐 Réseaux et communauté",
+        name="🎮 Studio Roblox et communauté",
         value=(
-            "Rappels YouTube, Twitch, TikTok et réseaux, salons Blox Fruits, valeurs "
-            "des trades, clips, CV joueurs, recrutements, partenariats, sondages, "
-            "suggestions et contenus communautaires."
+            "Avancement des jeux, mises à jour, annonces d'admin abuse, nouveaux jeux, "
+            "roadmap publique, tests communautaires, signalements de bugs, clips, "
+            "suggestions et contenus de la communauté."
         ),
         inline=False,
     )
     embed.add_field(
-        name="🏴‍☠️ Équipages permanents",
+        name="🧪 Tests et création Roblox",
         value=(
-            "Création à partir du niveau 10, rôle Capitaine, présentation publique, "
-            "CV par formulaire, annonces avec bouton Postuler, candidature privée, "
-            "acceptation/refus, salons privés, vice-capitaine, limite, invitations, "
-            "exclusions, transfert, journal privé, classement d'activité et guide "
-            "complet envoyé en MP au capitaine."
+            "Espace bêta-test, retours et bugs, ainsi que des salons dédiés au "
+            "développement, building, UI design, modélisation, audio, ressources et "
+            "idées de jeux Roblox."
         ),
         inline=False,
     )
     embed.add_field(
-        name="🤝 Marché des trades",
+        name="📢 Communication des jeux",
         value=(
-            "Publication d'offres avec emojis, bouton d'intérêt, salon privé, "
-            "transaction exclusive et réputation de 1 à 5 étoiles."
+            "Espaces officiels pour présenter le jeu principal, les projets en cours, "
+            "les anciens jeux, leurs liens et le statut des serveurs."
         ),
         inline=False,
     )
@@ -8753,7 +8832,7 @@ async def publish_bot_update(guild: discord.Guild) -> None:
     embed.add_field(
         name="🔊 Vocaux temporaires",
         value=(
-            "Création d'un équipage vocal, limite personnalisée, mode privé, invitation "
+            "Création d'un vocal temporaire, limite personnalisée, mode privé, invitation "
             "avec lien direct, expulsion, suppression à vide et transmission automatique "
             "au membre présent depuis le plus longtemps."
         ),
@@ -8762,9 +8841,9 @@ async def publish_bot_update(guild: discord.Guild) -> None:
     embed.add_field(
         name="📢 Automatisations",
         value=(
-            "Messages de bienvenue, règlement, FAQ, consignes des tickets, sécurité "
-            "des trades, modèles de CV, règles quotidiennes des clips, rappels sociaux, "
-            "giveaways, événements et publication versionnée des mises à jour."
+            "Messages de bienvenue, règlement, FAQ, consignes des tickets, règles des "
+            "clips, rappels sociaux, giveaways, événements et publication versionnée "
+            "des mises à jour du bot."
         ),
         inline=False,
     )
@@ -8823,7 +8902,6 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
                 "`/niveau` • afficher ta carte\n"
                 "`/classement` • classement d'activité\n"
                 "`/invites` • consulter tes invitations\n"
-                "`/cv-creer` • créer ou modifier ton CV\n"
                 "`/suggestion` • proposer une idée"
             ),
             inline=False,
@@ -8839,27 +8917,11 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
             inline=False,
         )
         embed.add_field(
-            name="🏴‍☠️ Équipages",
+            name="🎮 Studio Roblox",
             value=(
-                "`/equipage-creer`\n"
-                "`/equipage-recrutement`\n"
-                "`/equipage-commandes`\n"
-                "`/equipage-inviter` • `/equipage-exclure`\n"
-                "`/equipage-vice-capitaine` • `/equipage-limite`\n"
-                "`/equipage-membres` • `/equipage-classement`\n"
-                "`/equipage-transferer`\n"
-                "`/equipage-quitter`\n"
-                "`/equipage-supprimer`"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="🤝 Trades",
-            value=(
-                "`/trade-publier`\n"
-                "`/trade-avis`\n"
-                "`/trade-fermer`\n"
-                "`/trade-profil`"
+                "Consulte les salons d'avancement, de mises à jour, de nouveaux jeux "
+                "et d'admin abuse. Utilise `/suggestion` pour proposer une idée et "
+                "le support pour signaler un bug ou un problème d'achat."
             ),
             inline=False,
         )
@@ -8972,16 +9034,15 @@ async def refresh_command_guides(guild: discord.Guild) -> None:
 @bot.event
 async def setup_hook() -> None:
     initialize_database()
+    for command_name in LEGACY_BLOX_COMMANDS:
+        bot.tree.remove_command(command_name)
     bot.add_view(VerificationView())
     bot.add_view(RoleSelectionView())
     bot.add_view(TicketPanelView())
     bot.add_view(RecruitmentPanelView())
     bot.add_view(TicketControlView())
     bot.add_view(GiveawayView())
-    bot.add_view(TradeOfferView())
     bot.add_view(CommunityEventView())
-    bot.add_view(CrewRecruitmentView())
-    bot.add_view(CrewApplicationView())
     bot.add_view(SuggestionVoteView())
     bot.add_view(SanctionUndoView())
     if not voice_xp_loop.is_running():
@@ -9458,24 +9519,25 @@ async def on_member_join(member: discord.Member) -> None:
         return
 
     embed = discord.Embed(
-        title=f"🏴‍☠️ Bienvenue sur {member.guild.name} !",
+        title=f"🎮 Bienvenue sur {member.guild.name} !",
         description=(
-            f"Bienvenue à bord, {member.mention} ! 🌊\n\n"
-            f"Tu viens de rejoindre la communauté de **{member.guild.name}**, consacrée à "
-            "**Blox Fruits**, aux vidéos, aux lives et aux aventures entre joueurs.\n\n"
+            f"Bienvenue, {member.mention} ! 🚀\n\n"
+            f"Tu viens de rejoindre la communauté de **{member.guild.name}**, consacrée "
+            "à la création de jeux Roblox, à leur développement et aux événements en jeu.\n\n"
             "**Pour accéder au serveur :**\n"
             f"1️⃣ Lis attentivement le règlement dans `{RULES_CHANNEL_NAME}`\n"
             f"2️⃣ Clique sur le bouton dans `{VERIFICATION_CHANNEL_NAME}`\n"
-            "3️⃣ Choisis ensuite tes rôles, activités et ta race\n\n"
-            "Une fois vérifié, tu pourras discuter, participer aux événements, "
-            "trouver un équipage et créer ton propre vocal temporaire.\n\n"
+            "3️⃣ Choisis ensuite tes notifications, ton profil et tes plateformes\n\n"
+            "Une fois vérifié, tu pourras suivre l'avancement des jeux, recevoir les "
+            "annonces d'updates et d'admin abuse, proposer des idées, signaler des bugs "
+            "et participer aux tests et événements.\n\n"
             f"Tu es notre **{member.guild.member_count}ᵉ membre**. "
-            "Prépare-toi à prendre la mer ! ⚓"
+            "Bienvenue dans l'aventure ! 🎮"
         ),
         colour=discord.Colour.orange(),
     )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text=f"{member.guild.name} • Bon voyage parmi nous !")
+    embed.set_footer(text=f"{member.guild.name} • Merci de rejoindre la communauté !")
     try:
         await welcome_channel.send(embed=embed)
     except discord.Forbidden:

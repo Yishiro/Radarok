@@ -1,6 +1,6 @@
-# Bot Discord communautaire
+# Bot Discord communautaire pour studio Roblox
 
-Bot Discord communautaire universel. La commande administrateur `/setup`
+Bot Discord destiné à la communauté d'un studio de création Roblox. La commande administrateur `/setup`
 reconstruit automatiquement la structure complète de chaque serveur où il est
 utilisé, sans nom, identifiant ou marque imposés.
 
@@ -49,10 +49,10 @@ utilisé, sans nom, identifiant ou marque imposés.
 - Les salons renseignés dans `PRESERVED_SETUP_CHANNEL_IDS` ne sont jamais
   supprimés par `/setup`.
 - Les permissions d'écriture sont appliquées salon par salon. Le règlement,
-  l'accueil, les annonces, réseaux, panneaux, sondages, niveaux, giveaways,
-  valeurs, stocks et mises à jour sont en lecture seule pour les membres.
-- Les discussions, médias, créations, suggestions, commandes et salons
-  d'entraide Blox Fruits restent ouverts aux membres vérifiés.
+  les annonces, l'avancement, les mises à jour, l'admin abuse, la roadmap et
+  les informations sur les jeux sont en lecture seule pour les membres.
+- Les discussions, médias, clips, suggestions, signalements de bugs et espaces
+  de création Roblox restent ouverts aux membres vérifiés.
 - Toutes les catégories utilisent le décor `○─────Nom─────➤`, sauf les Vocaux
   Staff qui reprennent le décor spécial `『◉』 ╰⁺°✧・⚙(Vocales Staff)⚙・✧°⁺╮`.
 - Les catégories Vocaux Staff et Serveur Stat sont créées en premier. Les
@@ -60,10 +60,10 @@ utilisé, sans nom, identifiant ou marque imposés.
   peuvent rejoindre que la salle d'attente ; le staff accède à tous les bureaux.
 - Les compteurs Membres, Humains, Bots et Boosts sont affichés dans des salons
   vocaux verrouillés et actualisés automatiquement.
-- Les espaces Événement, Partage et Partenariat sont inclus. Seul le rôle
+- Les espaces Jeux, Tests, Événements, Création Roblox et Partenariat sont inclus. Seul le rôle
   `🤝・Partenaire` peut écrire dans le chat partenaire.
-- Elle crée les rôles d'équipe, communautaires, de notifications, d'activités,
-  de races Blox Fruits et de progression qui n'existent pas encore.
+- Elle crée les rôles du studio, communautaires, de notifications, de plateformes
+  Roblox et de progression qui n'existent pas encore.
 - Elle attribue le rôle `👑・Fondateur` au propriétaire du serveur.
 - Elle publie trois menus de rôles persistants dans `🎭・choix-des-rôles`.
 - La catégorie `🔒・ÉQUIPE` est visible uniquement par les rôles du staff.
@@ -73,7 +73,7 @@ utilisé, sans nom, identifiant ou marque imposés.
   du règlement avec le bouton persistant, il reçoit `✅・Membre` et accède au serveur.
 - Le règlement complet est publié dans `📜・règlement`.
 - Les bots reçoivent automatiquement le rôle `🤖・Bots`.
-- Rejoindre `➕・Créer un vocal` crée un vocal `Équipage de …`, y déplace le
+- Rejoindre `➕・Créer un vocal` crée un vocal `Vocal de …`, y déplace le
   membre et supprime automatiquement le salon lorsqu'il devient vide.
 - Le propriétaire contrôle son vocal avec `/vocal-limite`, `/vocal-prive`,
   `/vocal-inviter` et `/vocal-expulser`.
@@ -134,9 +134,6 @@ utilisé, sans nom, identifiant ou marque imposés.
 - L'auteur ou le staff peut demander sa fermeture, avec confirmation.
 - Une transcription texte est envoyée dans `📁・transcripts-tickets` et conservée
   localement dans le dossier `transcripts`.
-- Les trois salons `événement` utilisent le type « salon de conférence » (Stage).
-  Si Discord refuse ce type (notamment lorsque le mode Communauté est désactivé),
-  `/setup` les crée en salons vocaux et continue la configuration.
 
 ## Protection automatique
 
@@ -166,29 +163,17 @@ utilisé, sans nom, identifiant ou marque imposés.
   15 h et 21 h, heure de Paris.
 - Le rappel précédent est remplacé afin d'éviter l'accumulation de messages.
 
-## Équipages et trades
+## Studio Roblox
 
-- Le niveau 10 est requis pour `/equipage-creer`. Un membre ne peut appartenir
-  qu'à un seul équipage.
-- Un équipage reçoit un rôle, un salon textuel et un vocal privés.
-- Le créateur reçoit le rôle `👑・Capitaine d'équipage`.
-- Le staff peut utiliser `/equipage-creer-pour` pour créer directement un
-  équipage au nom d'un membre et le désigner capitaine.
-- `/cv-creer`, utilisable dans le salon CV, ouvre un formulaire et publie ou
-  actualise le CV du joueur.
-- `/equipage-recrutement`, réservé au capitaine et au salon de recrutement,
-  ouvre un formulaire puis publie une annonce avec un bouton Postuler.
-- Un CV est obligatoire pour postuler. Le bot crée ensuite un salon privé entre
-  le candidat et le capitaine, avec les boutons Accepter et Refuser.
-- Une acceptation attribue automatiquement le rôle de l'équipage.
-- Le propriétaire utilise `/equipage-supprimer`; les membres peuvent utiliser
-  `/equipage-quitter`.
-- `/trade-publier` accepte du texte et les emojis personnalisés du serveur.
-- Le bouton d'intérêt crée un salon privé entre les deux participants. Aucun
-  des deux ne peut commencer un autre trade avant la clôture.
-- `/trade-avis` enregistre une note de 1 à 5. Les deux avis clôturent le trade.
-  `/trade-fermer` permet de terminer une transaction annulée ou inachevée.
-- `/trade-profil` affiche la moyenne et le nombre d'avis reçus.
+- Les salons Avancement, Mises à jour, Admin Abuse, Nouveaux jeux et Roadmap
+  permettent à l'équipe de communiquer sans que les annonces soient noyées.
+- La catégorie Nos jeux regroupe le jeu principal, les projets en développement,
+  les anciens jeux, les liens officiels et le statut des serveurs.
+- Les bêta-testeurs disposent de salons réservés pour leurs retours et rapports.
+- Les espaces Développement, Building, UI, modélisation, son et ressources
+  facilitent les échanges autour de la création Roblox.
+- Les anciennes commandes d'équipages Blox Fruits, de CV joueur et de trades
+  ne sont plus synchronisées sur Discord.
 
 ## Modération et journaux
 
@@ -213,18 +198,6 @@ utilisé, sans nom, identifiant ou marque imposés.
   vocales, surnoms, salons, rôles, permissions, sanctions et autres changements.
 - Le bot doit posséder les permissions `Voir le journal d'audit` et
   `Gérer les salons` pour assurer ce suivi et recréer le salon s'il est absent.
-
-## Gestion avancée des équipages
-
-- Le capitaine reçoit automatiquement en MP le guide de toutes ses commandes.
-- `/equipage-inviter`, `/equipage-exclure`, `/equipage-membres` et
-  `/equipage-limite` assurent la gestion quotidienne.
-- `/equipage-vice-capitaine` désigne un second disposant des droits de gestion.
-- `/equipage-transferer` transmet définitivement la capitainerie et
-  `/equipage-commandes` renvoie le guide privé.
-- `/equipage-classement` compare l'XP cumulée des membres de chaque équipage.
-- Chaque arrivée, départ, exclusion, nomination et changement important est
-  enregistré dans le salon privé de l'équipage.
 
 ## Suggestions
 
