@@ -85,6 +85,52 @@ class RoleSpec:
     permissions: discord.Permissions = discord.Permissions.none()
     hoist: bool = False
 ROLE_SPECS = (RoleSpec('👑・Founder', 15844367, discord.Permissions(administrator=True), True), RoleSpec('⚙️・Studio Manager', 15105570, discord.Permissions(manage_guild=True, manage_channels=True, manage_roles=True, manage_messages=True, kick_members=True, ban_members=True, moderate_members=True, view_audit_log=True), True), RoleSpec('🛡️・Administrator', 15158332, discord.Permissions(manage_channels=True, manage_roles=True, manage_messages=True, kick_members=True, ban_members=True, moderate_members=True, view_audit_log=True), True), RoleSpec('🔱・Senior Staff', 9323693, discord.Permissions.none(), True), RoleSpec('🔨・Moderator', 3447003, discord.Permissions(manage_messages=True, kick_members=True, moderate_members=True, view_audit_log=True), True), RoleSpec('🧪・Trial Moderator', 6139362, discord.Permissions(manage_messages=True, moderate_members=True), True), RoleSpec('💻・Developer', 5793266, hoist=True), RoleSpec('🧱・Builder', 15105570, hoist=True), RoleSpec('🎨・UI Designer', 10181046, hoist=True), RoleSpec('🖌️・3D Modeler', 1752220, hoist=True), RoleSpec('🎵・Sound Designer', 15277667, hoist=True), RoleSpec('📢・Community Manager', 15965202, hoist=True), RoleSpec('🤝・Partner', 1752220, hoist=True), RoleSpec('⭐・VIP', 15965202, hoist=True), RoleSpec('💎・Booster', 15418782, hoist=True), RoleSpec('🥉・Recruiter', 13467442, hoist=True), RoleSpec('🥈・Ambassador', 12436423, hoist=True), RoleSpec('🥇・Influencer', 15844367, hoist=True), RoleSpec('💎・Master Recruiter', 10181046, hoist=True), RoleSpec('🎥・Content Creator', 15277667, hoist=True), RoleSpec('🏆・Giveaway Winner', 16044095, hoist=True), RoleSpec('🧪・Beta Tester', 47252, hoist=True), RoleSpec('🥇・Event Champion', 15844367, hoist=True), RoleSpec('🥈・Event Finalist', 12436423, hoist=True), RoleSpec('🥉・Event Third Place', 13467442, hoist=True), RoleSpec('✅・Member', 3066993), RoleSpec('🔒・Unverified', 8359053), RoleSpec('🤖・Bots', 9807270), RoleSpec('🔴・YouTube Videos', 16711680), RoleSpec('🟣・Twitch Streams', 9520895), RoleSpec('🎉・Giveaways', 15844367), RoleSpec('📢・Announcements', 15105570), RoleSpec('🤝・Partnerships', 1752220), RoleSpec('📰・Updates', 3447003), RoleSpec('🚨・Admin Abuse', 12597547), RoleSpec('🎮・New Games', 9323693), RoleSpec('🧪・Test Sessions', 47252), RoleSpec('📅・Events', 2719929), RoleSpec('🆘・Helper', 2600544, hoist=True), RoleSpec('🎮・Player', 3447003), RoleSpec('💡・Creator', 15844367), RoleSpec('🐛・Bug Hunter', 15158332), RoleSpec('📱・Mobile', 3066993), RoleSpec('💻・PC', 5793266), RoleSpec('🎮・Console', 10181046), RoleSpec('💫・Legend', 15844367), RoleSpec('🥇・Veteran', 15105570), RoleSpec('🥈・Active', 12436423), RoleSpec('🥉・Regular', 13467442), RoleSpec('🌱・Newcomer', 8577194))
+LEGACY_ROLE_NAMES = {
+    '👑・Founder': ('👑・Fondateur',),
+    '⚙️・Studio Manager': ('⚙️・Responsable du studio',),
+    '🛡️・Administrator': ('🛡️・Administrateur',),
+    '🔱・Senior Staff': ('🔱・Staff supérieur',),
+    '🔨・Moderator': ('🔨・Modérateur',),
+    '🧪・Trial Moderator': ('🧪・Modérateur en test',),
+    '💻・Developer': ('💻・Développeur',),
+    '🖌️・3D Modeler': ('🖌️・Modeleur 3D',),
+    '🤝・Partner': ('🤝・Partenaire',),
+    '🥉・Recruiter': ('🥉・Recruteur',),
+    '🥈・Ambassador': ('🥈・Ambassadeur',),
+    '🥇・Influencer': ('🥇・Influenceur',),
+    '💎・Master Recruiter': ('💎・Maître recruteur',),
+    '🎥・Content Creator': ('🎥・Créateur de contenu',),
+    '🏆・Giveaway Winner': ('🏆・Gagnant Giveaway',),
+    '🧪・Beta Tester': ('🧪・Bêta testeur',),
+    '🥇・Event Champion': ('🥇・Champion événement',),
+    '🥈・Event Finalist': ('🥈・Finaliste événement',),
+    '🥉・Event Third Place': ('🥉・Troisième événement',),
+    '✅・Member': ('✅・Membre',),
+    '🔒・Unverified': ('🔒・Non vérifié',),
+    '🔴・YouTube Videos': ('🔴・Vidéos YouTube',),
+    '🟣・Twitch Streams': ('🟣・Lives Twitch',),
+    '📢・Announcements': ('📢・Annonces',),
+    '🤝・Partnerships': ('🤝・Partenariats',),
+    '📰・Updates': ('📰・Mises à jour',),
+    '🎮・New Games': ('🎮・Nouveaux jeux',),
+    '🧪・Test Sessions': ('🧪・Sessions de test',),
+    '📅・Events': ('📅・Événements',),
+    '🎮・Player': ('🎮・Joueur',),
+    '💡・Creator': ('💡・Créateur',),
+    '💫・Legend': ('💫・Légende',),
+    '🥇・Veteran': ('🥇・Vétéran',),
+    '🥈・Active': ('🥈・Actif',),
+    '🥉・Regular': ('🥉・Habitué',),
+    '🌱・Newcomer': ('🌱・Nouveau',),
+}
+EXTRA_LEGACY_ROLE_RENAMES = {
+    "👑・Capitaine d'équipage": '👑・Crew Captain',
+    '🆘・Helper Blox Fruits': '🆘・Helper',
+    '👤・Humain': '👤・Human',
+    '🦈・Requin': '🦈・Shark',
+    '👼・Ange': '👼・Angel',
+    '🐇・Lapin': '🐇・Rabbit',
+}
 UNCATEGORIZED_CHANNELS: tuple[ChannelSpec, ...] = ()
 SERVER_STRUCTURE = (CategorySpec('🔐・VERIFICATION', (ChannelSpec('📜・rules', read_only=True), ChannelSpec('👋・welcome', read_only=True), ChannelSpec('✅・verification', read_only=True)), verification_only=True), CategorySpec('📌・WELCOME', (ChannelSpec('📢・announcements', read_only=True), ChannelSpec('🎭・role-selection', read_only=True), ChannelSpec('❓・faq', read_only=True), ChannelSpec('🔗・official-links', read_only=True), ChannelSpec('📰・server-changelog', read_only=True), ChannelSpec('💎・boost-thanks', read_only=True))), CategorySpec('📢・STUDIO NEWS', (ChannelSpec('🛠️・progress', read_only=True), ChannelSpec('📰・updates', read_only=True), ChannelSpec('🚨・admin-abuse', read_only=True), ChannelSpec('🎮・new-games', read_only=True), ChannelSpec('🗺️・roadmap', read_only=True))), CategorySpec('🎮・OUR GAMES', (ChannelSpec('🎯・main-game', read_only=True), ChannelSpec('🧪・game-in-development', read_only=True), ChannelSpec('🗄️・legacy-games', read_only=True), ChannelSpec('🔗・game-links', read_only=True), ChannelSpec('📊・server-status', read_only=True))), CategorySpec('💬・COMMUNITY', (ChannelSpec('💬・general-chat'), ChannelSpec('🎮・game-discussion'), ChannelSpec('😂・memes'), ChannelSpec('📷・media'), ChannelSpec('🎥・clips'), ChannelSpec('💡・suggestions'), ChannelSpec('🐛・bug-reports'), ChannelSpec('🤖・bot-commands'), ChannelSpec('🎉・giveaways', read_only=True))), CategorySpec('🧪・TESTING AND FEEDBACK', (ChannelSpec('📋・become-a-tester', read_only=True), ChannelSpec('🧪・test-announcements', read_only=True), ChannelSpec('📝・tester-feedback', read_only=True, write_roles=('🧪・Beta Tester',)), ChannelSpec('🐞・test-bugs', read_only=True, write_roles=('🧪・Beta Tester',)), ChannelSpec('🔒・test-access', read_only=True))), CategorySpec('🎪・EVENTS', (ChannelSpec('📅・calendar', read_only=True), ChannelSpec('🎪・event-announcements', read_only=True), ChannelSpec('🚨・admin-abuse-schedule', read_only=True), ChannelSpec('🎁・contests', read_only=True), ChannelSpec('🏆・results', read_only=True))), CategorySpec('💻・ROBLOX CREATION', (ChannelSpec('💻・development'), ChannelSpec('🧱・building'), ChannelSpec('🎨・ui-and-design'), ChannelSpec('🖌️・modeling'), ChannelSpec('🎵・sounds-and-music'), ChannelSpec('💡・game-ideas'), ChannelSpec('📚・roblox-resources'))), CategorySpec('🌐・SOCIAL MEDIA', (ChannelSpec('🔴・youtube', read_only=True), ChannelSpec('🟣・twitch', read_only=True), ChannelSpec('🎵・tiktok', read_only=True), ChannelSpec('📱・social-media', read_only=True), ChannelSpec('🔔・notifications', read_only=True))), CategorySpec('🤝・PARTNERSHIPS', (ChannelSpec('🤝・partners', read_only=True), ChannelSpec('🗣️・partner-chat', read_only=True, write_roles=('🤝・Partner',)))), CategorySpec('🎟️・SUPPORT', (ChannelSpec('📜・ticket-rules', read_only=True), ChannelSpec('🎫・open-a-ticket', read_only=True))), CategorySpec('🎫・OPEN TICKETS', (), staff_only=True), CategorySpec('🔊・VOICE CHANNELS', (ChannelSpec('🔊・General', 'voice'), ChannelSpec('🎮・In Game', 'voice'), ChannelSpec('🧪・Beta Test', 'voice', 12), ChannelSpec('💻・Development', 'voice', 10), ChannelSpec('🎵・Chill', 'voice'), ChannelSpec('😴・AFK', 'voice'))), CategorySpec('➕・CREATE YOUR VOICE CHANNEL', (ChannelSpec('➕・Create a voice channel', 'voice'),)), CategorySpec('🔒・STAFF', (ChannelSpec('💬・staff-chat'), ChannelSpec('📋・organization'), ChannelSpec('🗺️・internal-roadmap'), ChannelSpec('🐛・bugs-to-fix'), ChannelSpec('🧪・internal-tests'), ChannelSpec('📢・announcement-prep'), ChannelSpec('📨・staff-tickets'), ChannelSpec('🔊・Studio Meeting', 'voice')), staff_only=True), CategorySpec('🛡️・LOGS', (ChannelSpec('📥・joins-leaves'), ChannelSpec('🔊・voice-logs'), ChannelSpec('🗑️・deleted-messages'), ChannelSpec('✏️・edited-messages'), ChannelSpec('⚖️・sanctions'), ChannelSpec('🧾・discord-logs'), ChannelSpec('📁・ticket-transcripts')), staff_only=True))
 NOTIFICATION_ROLES = ('🔴・YouTube Videos', '🟣・Twitch Streams', '🎉・Giveaways', '📢・Announcements', '🤝・Partnerships', '📰・Updates', '🚨・Admin Abuse', '🎮・New Games', '🧪・Test Sessions', '📅・Events')
@@ -745,7 +791,7 @@ class GiveawayView(discord.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=None)
 
-    @discord.ui.button(label='Participer', emoji='🎉', style=discord.ButtonStyle.success, custom_id='community:giveaway:join')
+    @discord.ui.button(label='Enter', emoji='🎉', style=discord.ButtonStyle.success, custom_id='community:giveaway:join')
     async def participate(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if interaction.message is None or interaction.guild is None or (not isinstance(interaction.user, discord.Member)):
             return
@@ -771,7 +817,7 @@ class GiveawayView(discord.ui.View):
             return
         rows = require_database().execute('SELECT user_id FROM giveaway_entries WHERE message_id = ?', (interaction.message.id,)).fetchall()
         names = [member.mention for user_id, in rows[:40] if (member := interaction.guild.get_member(user_id)) is not None]
-        suffix = f'\n… et {len(rows) - 40} autre(s).' if len(rows) > 40 else ''
+        suffix = f'\n… and {len(rows) - 40} more.' if len(rows) > 40 else ''
         await interaction.response.send_message(f"**{len(rows)} participant(s)**\n{(', '.join(names) if names else 'No participants.')}{suffix}", ephemeral=True)
 
     @discord.ui.button(label='Duration', emoji='⏳', style=discord.ButtonStyle.primary, custom_id='community:giveaway:duration')
@@ -780,27 +826,52 @@ class GiveawayView(discord.ui.View):
             return
         giveaway = get_giveaway(interaction.message.id)
         if giveaway is None:
-            await interaction.response.send_message('Giveaway introuvable.', ephemeral=True)
+            await interaction.response.send_message('Giveaway not found.', ephemeral=True)
             return
         remaining = max(giveaway[5] - int(time.time()), 0)
-        await interaction.response.send_message(f'Temps restant exact : **{format_remaining(remaining)}**.', ephemeral=True)
+        await interaction.response.send_message(f'Exact time remaining: **{format_remaining(remaining)}**.', ephemeral=True)
 
-    @discord.ui.button(label='Mes chances', emoji='🍀', style=discord.ButtonStyle.primary, custom_id='community:giveaway:chance')
+    @discord.ui.button(label='My chances', emoji='🍀', style=discord.ButtonStyle.primary, custom_id='community:giveaway:chance')
     async def chances(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not isinstance(interaction.user, discord.Member):
             return
         total, invite_bonus, booster_bonus = giveaway_chance(interaction.user)
-        await interaction.response.send_message(f'Chance de base : **1**\nBonus invitations : **+{invite_bonus:g}**\nBonus Booster : **+{booster_bonus:g}**\nTotal : **{total:g} chance(s)**', ephemeral=True)
+        await interaction.response.send_message(f'Base chance: **1**\nInvite bonus: **+{invite_bonus:g}**\nBooster bonus: **+{booster_bonus:g}**\nTotal: **{total:g} chance(s)**', ephemeral=True)
 
 async def ensure_roles(guild: discord.Guild, reason: str) -> tuple[dict[str, discord.Role], int]:
     roles: dict[str, discord.Role] = {}
     created_count = 0
     for spec in ROLE_SPECS:
         role = discord.utils.get(guild.roles, name=spec.name)
+        legacy_roles = [legacy_role for legacy_name in LEGACY_ROLE_NAMES.get(spec.name, ()) if (legacy_role := discord.utils.get(guild.roles, name=legacy_name)) is not None]
+        if role is None and legacy_roles:
+            role = legacy_roles.pop(0)
+            await role.edit(name=spec.name, colour=discord.Colour(spec.colour), permissions=spec.permissions, hoist=spec.hoist, mentionable=False, reason=f'{reason} • English role migration')
         if role is None:
             role = await guild.create_role(name=spec.name, colour=discord.Colour(spec.colour), permissions=spec.permissions, hoist=spec.hoist, mentionable=False, reason=reason)
             created_count += 1
+        else:
+            await role.edit(colour=discord.Colour(spec.colour), permissions=spec.permissions, hoist=spec.hoist, mentionable=False, reason=f'{reason} • synchronize role settings')
+        for legacy_role in legacy_roles:
+            if legacy_role.is_default() or legacy_role.managed:
+                continue
+            for member in legacy_role.members:
+                if role not in member.roles:
+                    await member.add_roles(role, reason=f'{reason} • migrate {legacy_role.name}')
+            await legacy_role.delete(reason=f'{reason} • merged into {spec.name}')
         roles[spec.name] = role
+    for old_name, new_name in EXTRA_LEGACY_ROLE_RENAMES.items():
+        legacy_role = discord.utils.get(guild.roles, name=old_name)
+        if legacy_role is None or legacy_role.managed:
+            continue
+        target_role = discord.utils.get(guild.roles, name=new_name)
+        if target_role is None:
+            await legacy_role.edit(name=new_name, reason=f'{reason} • English role migration')
+            continue
+        for member in legacy_role.members:
+            if target_role not in member.roles:
+                await member.add_roles(target_role, reason=f'{reason} • migrate {old_name}')
+        await legacy_role.delete(reason=f'{reason} • merged into {new_name}')
     founder_role = roles['👑・Founder']
     owner = guild.owner
     if owner is None:
@@ -1866,7 +1937,7 @@ class TradeOfferView(discord.ui.View):
         cursor = connection.execute('\n            INSERT INTO trade_deals (\n                guild_id, post_message_id, seller_id, buyer_id,\n                channel_id, created_at\n            ) VALUES (?, ?, ?, ?, ?, ?)\n            ', (interaction.guild.id, interaction.message.id, seller.id, interaction.user.id, channel.id, int(time.time())))
         connection.execute("UPDATE trade_posts SET status = 'matched' WHERE message_id = ?", (interaction.message.id,))
         connection.commit()
-        await channel.send(embed=discord.Embed(title=f'🤝 Trade #{cursor.lastrowid}', description=f"Participants : {seller.mention} et {interaction.user.mention}\n\n**Proposition :** {post[1]}\n**Recherche :** {post[2]}\n\nDiscuss here without sharing identifiers or accepting a promise out of the game's official window.\n\nAt the end, everyone uses `/trade-review`. After both reviews, the channel closes. Use `/trade-close` if the trade is cancelled.", colour=discord.Colour.teal()))
+        await channel.send(embed=discord.Embed(title=f'🤝 Trade #{cursor.lastrowid}', description=f"Participants: {seller.mention} and {interaction.user.mention}\n\n**Offering:** {post[1]}\n**Looking for:** {post[2]}\n\nDiscuss here without sharing credentials or accepting promises outside the game's official trade window.\n\nAt the end, everyone uses `/trade-review`. After both reviews, the channel closes. Use `/trade-close` if the trade is cancelled.", colour=discord.Colour.teal()))
         await interaction.followup.send(f'Trade Channel Created: {channel.mention}', ephemeral=True)
 
 @bot.tree.command(name='trade-publish', description='Publish an offer on the market.')
@@ -2094,7 +2165,7 @@ async def unwarn_command(interaction: discord.Interaction, identifiant: int) -> 
         return
     row = require_database().execute('\n        SELECT user_id, reason FROM warnings\n        WHERE id = ? AND guild_id = ? AND active = 1\n        ', (identifiant, interaction.guild.id)).fetchone()
     if row is None:
-        await interaction.response.send_message('Warning actif introuvable.', ephemeral=True)
+        await interaction.response.send_message('Active warning not found.', ephemeral=True)
         return
     require_database().execute('\n        UPDATE warnings SET active = 0, removed_by = ?, removed_at = ?\n        WHERE id = ?\n        ', (interaction.user.id, int(time.time()), identifiant))
     require_database().commit()
@@ -3717,6 +3788,7 @@ async def on_ready() -> None:
                 logging.exception('The automatic setup marker could not be written')
             logging.info('One-time automatic setup completed on server %s', TARGET_GUILD_ID)
     for guild in managed_guilds():
+        await ensure_roles(guild, 'Synchronize English role names on startup')
         helper_role = await ensure_helper_role(guild)
         if helper_role is not None:
             await reconcile_helper_ticket_permissions(guild, helper_role)
